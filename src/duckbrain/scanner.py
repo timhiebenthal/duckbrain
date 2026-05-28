@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Any
+
 import yaml
 
 from duckbrain import PageMetadata
@@ -23,7 +24,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         return {}, content
 
     yaml_block = content[3:end_idx].strip()
-    body = content[end_idx + 3:].strip()
+    body = content[end_idx + 3 :].strip()
 
     if not yaml_block:
         return {}, body

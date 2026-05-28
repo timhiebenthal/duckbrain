@@ -1,18 +1,36 @@
 [project]
 name = "duckbrain"
 version = "0.1.0"
-description = "Add your description here"
+description = "DuckDB-backed MCP memory server for Obsidian vaults — structured search, read, and write access for AI coding agents."
 readme = "README.md"
 authors = [
     { name = "Tim Hiebenthal", email = "timhiebenthal@gmail.com" }
 ]
-requires-python = ">=3.14"
+license = "MIT"
+requires-python = ">=3.10"
+keywords = ["mcp", "obsidian", "memory", "knowledge-base", "duckdb", "ai-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "duckdb>=1.5.3",
     "mcp[cli]>=1.27.1",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/timhiebenthal/duckbrain"
+Repository = "https://github.com/timhiebenthal/duckbrain"
+Issues = "https://github.com/timhiebenthal/duckbrain/issues"
 
 [project.scripts]
 duckbrain = "duckbrain.server:main"
@@ -23,5 +41,22 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.1.0",
+    "pre-commit>=4.6.0",
     "pytest>=9.0.3",
+    "ruff>=0.15.15",
+    "types-pyyaml>=6.0.12.20260518",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+check_untyped_defs = true
+files = ["src/duckbrain"]

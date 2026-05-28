@@ -49,9 +49,7 @@ def build_fts_index(pages: list[PageMetadata]) -> duckdb.DuckDBPyConnection:
         )
 
     # Build FTS index on title, tags, body — using filepath as the document id
-    conn.execute(
-        "PRAGMA create_fts_index('pages', 'filepath', 'title', 'tags', 'body')"
-    )
+    conn.execute("PRAGMA create_fts_index('pages', 'filepath', 'title', 'tags', 'body')")
 
     return conn
 
@@ -152,9 +150,7 @@ def get_stats(
         "synthesis": 0,
         "daily": 0,
     }
-    rows = conn.execute(
-        "SELECT kind, COUNT(*) FROM pages GROUP BY kind"
-    ).fetchall()
+    rows = conn.execute("SELECT kind, COUNT(*) FROM pages GROUP BY kind").fetchall()
     for kind_val, count in rows:
         kind_counts[kind_val] = count
 
@@ -169,9 +165,8 @@ def get_stats(
                     all_tags.add(t_stripped)
 
     # Max updated date
-    max_updated = conn.execute(
-        "SELECT MAX(updated) FROM pages"
-    ).fetchone()[0]
+    row = conn.execute("SELECT MAX(updated) FROM pages").fetchone()
+    max_updated = row[0] if row else None
     last_modified: str | None = str(max_updated) if max_updated else None
 
     return {
