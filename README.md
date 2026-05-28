@@ -142,7 +142,24 @@ save what you learned so you don't repeat mistakes:
 **OpenCode** — add to your config's `instructions` field (`opencode.json`):
 
 ```json
-"instructions": ["/path/to/duckbrain/LEARNINGS.md"]
+"instructions": ["~/.config/opencode/LEARNINGS.md"]
+```
+
+Then create `~/.config/opencode/LEARNINGS.md` (or wherever you prefer — any path the config can reach):
+
+```markdown
+## Session Learnings
+
+When you encounter problems, debug issues, or discover non-obvious solutions,
+save the learning to the vault so it's available in future sessions:
+
+- Append to today's daily note:
+  vault_write(kind="daily", title="short summary", content="what you learned", tags=["debugging", "learned"])
+
+- For reusable concepts/patterns worth revisiting:
+  vault_write(kind="concept", title="Concept Name", content="explanation", tags=["relevant", "tags"])
+
+Do this proactively — don't wait to be asked. A learning saved is a bug not repeated.
 ```
 
 **Cursor** — add to `.cursorrules`:
