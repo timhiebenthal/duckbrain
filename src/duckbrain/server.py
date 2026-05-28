@@ -5,6 +5,7 @@ import sys
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from mcp.types import Icon
 
 from duckbrain.tools.vault_info import handle_vault_info
 from duckbrain.tools.vault_read import handle_vault_read
@@ -45,7 +46,16 @@ def get_vault_path() -> str:
 def main() -> None:
     """Entry point: start MCP server on stdio."""
     vault_path = get_vault_path()
-    server = FastMCP("duckbrain-vault")
+    server = FastMCP(
+        "duckbrain-vault",
+        icons=[
+            Icon(
+                src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/favicon.png",
+                mimeType="image/png",
+                sizes=["64x64"],
+            )
+        ],
+    )
 
     @server.tool()
     def vault_info() -> dict:
