@@ -63,8 +63,10 @@ That's it. Now connect your AI agent (see below) — you don't run duckbrain you
 ```bash
 git clone https://github.com/timhiebenthal/duckbrain.git
 cd duckbrain
-uv sync
+uv sync         # installs project + dev dependencies in a virtual environment
 ```
+
+This requires [uv](https://docs.astral.sh/uv/) (the Python package manager used for development). End users should use `pip install duckbrain` above.
 
 *(Optional: to verify the install, run `VAULT_PATH="/path/to/your/vault" uv run duckbrain`. It will appear to hang — that's correct, it's waiting on stdio. Press Ctrl+C to stop.)*
 
