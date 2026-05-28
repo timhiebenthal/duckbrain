@@ -110,7 +110,12 @@ Example for Claude Code:
 }
 ```
 
-Make sure `uv` is on your `PATH` and the working directory is the `duckbrain` project root. The `env` field in the config is all you need — no system-wide `VAULT_PATH` required.
+> **Tip:** Instead of hardcoding the path in every config, set `VAULT_PATH` once in your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`) and reference it in the config with your agent's env-var syntax:
+>
+> - OpenCode: `"VAULT_PATH": "{env:VAULT_PATH}"`
+> - Claude Code: `"VAULT_PATH": "${env:VAULT_PATH}"`
+
+Make sure `uv` is on your `PATH`.
 
 ### Auto-Writing Session Learnings
 
