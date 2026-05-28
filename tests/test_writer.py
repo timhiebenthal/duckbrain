@@ -255,3 +255,97 @@ def test_write_page_index_append_not_overwrite(temp_vault: Path) -> None:
     assert "- [[Jagged Frontier]] - Uneven LLM capability across tasks" in index_after
     # New entry present
     assert "- [[Test Entity]] - Test Entity" in index_after
+
+
+# ── Edge case tests ──────────────────────────────────────────────────────────
+
+
+def test_write_page_log_failure(temp_vault: Path, monkeypatch) -> None:
+    """When log append fails, write_page still succeeds with a warning."""
+    from duckbrain.writer import write_page
+
+    original_open = Path.open
+
+    def guarded_open(self, mode="r", *args, **kwargs):
+        if "log.md" in str(self) and ("a" in mode or "w" in mode):
+            raise PermissionError("Permission denied")
+        return original_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+
+    result = write_page(
+        str(temp_vault),
+        kind="entity",
+        title="Log Failure Test",
+        content="# Log Failure Test\n\nShould still create file.",
+        tags=["test"],
+    )
+
+    assert result["success"] is True
+    filepath = temp_vault / "wiki" / "entities" / "log-failure-test.md"
+    assert filepath.exists(), "Page file should still be created"
+    assert any("log" in w.lower() for w in result["warnings"])
+
+
+def test_write_page_index_failure(temp_vault: Path, monkeypatch) -> None:
+    """When index update fails, write_page still succeeds with a warning."""
+    from duckbrain.writer import write_page
+
+    original_open = Path.open
+
+    def guarded_open(self, mode="r", *args, **kwargs):
+        if "index.md" in str(self) and ("a" in mode or "w" in mode):
+            raise PermissionError("Permission denied")
+        return original_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded_open)
+
+    result = write_page(
+        str(temp_vault),
+        kind="entity",
+        title="Index Failure Test",
+        content="# Index Failure Test\n\nShould still create file.",
+        tags=["test"],
+    )
+
+    assert result["success"] is True
+    filepath = temp_vault / "wiki" / "entities" / "index-failure-test.md"
+    assert filepath.exists(), "Page file should still be created"
+    assert any("index" in w.lower() for w in result["warnings"])
+
+
+def test_write_page_existing_index_preserved(temp_vault: Path) -> None:
+    """After 3 writes to different kinds, all entries appear under correct sections."""
+    from duckbrain.writer import write_page
+
+    # Write entity "A"
+    write_page(str(temp_vault), kind="entity", title="A", content="# A\n\nEntity A.", tags=[])
+    # Write concept "B"
+    write_page(str(temp_vault), kind="concept", title="B", content="# B\n\nConcept B.", tags=[])
+    # Write synthesis "C"
+    write_page(str(temp_vault), kind="synthesis", title="C", content="# C\n\nSynthesis C.", tags=[])
+
+    index = (temp_vault / "wiki" / "index.md").read_text()
+
+    # All 3 new entries present
+    assert "- [[A]] - A" in index
+    assert "- [[B]] - B" in index
+    assert "- [[C]] - C" in index
+
+    # Original pre-existing entries preserved
+    assert "- [[Jason Ganz]]" in index
+    assert "- [[Jagged Frontier]]" in index
+
+    # Each entry is in the correct section (order: Entities < Concepts < Synthesis)
+    entities_idx = index.index("## Entities")
+    concepts_idx = index.index("## Concepts")
+    sources_idx = index.index("## Sources")
+    synthesis_idx = index.index("## Synthesis")
+
+    a_idx = index.index("- [[A]] - A")
+    b_idx = index.index("- [[B]] - B")
+    c_idx = index.index("- [[C]] - C")
+
+    assert entities_idx < a_idx < concepts_idx, "A should be under Entities"
+    assert concepts_idx < b_idx < sources_idx, "B should be under Concepts"
+    assert synthesis_idx < c_idx, "C should be under Synthesis"

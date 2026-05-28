@@ -105,3 +105,22 @@ def test_parse_frontmatter_malformed_yaml() -> None:
 
     assert meta == {}
     assert body == content
+
+
+# ── Edge case tests ──────────────────────────────────────────────────────────
+
+
+def test_scan_vault_non_utf8(temp_vault: Path) -> None:
+    """Binary non-UTF-8 file in wiki/synthesis/ is skipped gracefully."""
+    from duckbrain.scanner import scan_vault
+
+    binary_path = temp_vault / "wiki" / "synthesis" / "binary.md"
+    binary_path.write_bytes(b"\xff\xfe\x00\xff\x00\xff\x00\xff")
+
+    pages = scan_vault(str(temp_vault))
+
+    # Should not include the binary file
+    paths = [p.filepath for p in pages]
+    assert "wiki/synthesis/binary.md" not in paths
+    # Should still find the original 5 pages
+    assert len(pages) == 5

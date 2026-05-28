@@ -215,7 +215,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 
 ### Stream A: `server.py` — MCP stdio server entry point
 
-- [ ] **SP3-A1: Implement MCP server**
+- [x] **SP3-A1: Implement MCP server**
   - In `src/duckbrain/server.py`:
     - Create `mcp.Server` instance named "duckbrain"
     - Read `VAULT_PATH` from env (default: `/mnt/c/Users/timhi/Documents/obsidian/brain-workbench`)
@@ -228,7 +228,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
     - Run with stdio transport
   - **Run**: manual test — start server with `uv run python -m duckbrain.server`, verify it starts without error and listens on stdio
 
-- [ ] **SP3-A2: Add `pyproject.toml` entry point**
+- [x] **SP3-A2: Add `pyproject.toml` entry point**
   - Add `[project.scripts]` section: `duckbrain = "duckbrain.server:main"` (via `uv add` or manual edit if needed — note: edit pyproject.toml manually since uv doesn't have a `scripts` subcommand, but keep it minimal)
   - Verify: `uv run duckbrain` starts the server
 
@@ -236,7 +236,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 
 ### Stream B: E2E tests — Full MCP client against the server
 
-- [ ] **SP3-B1: Write E2E test with temp vault**
+- [x] **SP3-B1: Write E2E test with temp vault**
   - Create `tests/test_e2e.py`
   - Use `temp_vault` fixture. Launch the MCP server as a subprocess with `VAULT_PATH` set to the temp vault path.
   - Test: `test_e2e_vault_info(temp_vault)` — send `vault_info` request via MCP client, verify response has counts matching temp vault
@@ -244,7 +244,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
   - Test: `test_e2e_vault_write_and_search(temp_vault)` — write a new concept page via `vault_write`, then `vault_search` for it, verify it's found; also verify `wiki/index.md` and `wiki/log.md` on disk were updated
   - **Run**: `uv run pytest tests/test_e2e.py -v` → FAIL (expected — no server subprocess launch logic yet)
 
-- [ ] **SP3-B2: Implement E2E test infrastructure**
+- [x] **SP3-B2: Implement E2E test infrastructure**
   - In `tests/conftest.py`, add `start_server(temp_vault_path) -> subprocess.Popen` and `stop_server(proc)` fixtures or helpers
   - Use `mcp` client library to connect via stdio to the subprocess
   - **Run**: `uv run pytest tests/test_e2e.py -v` → PASS (all 3 tests)
@@ -253,7 +253,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 
 ### Stream C: Error handling + edge cases
 
-- [ ] **SP3-C1: Write edge case tests**
+- [x] **SP3-C1: Write edge case tests**
   - Add to `tests/test_writer.py`:
   - Test: `test_write_page_log_failure(temp_vault, monkeypatch)` — make `wiki/log.md` read-only, write should still succeed (file created) with warning about log
   - Test: `test_write_page_index_failure(temp_vault, monkeypatch)` — make `wiki/index.md` read-only, write succeeds with warning
@@ -263,7 +263,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
   - Test: `test_scan_vault_non_utf8(temp_vault)` — binary file in wiki/ → skipped gracefully
   - **Run**: `uv run pytest tests/test_scanner.py tests/test_writer.py -v` → FAIL
 
-- [ ] **SP3-C2: Implement edge case handling**
+- [x] **SP3-C2: Implement edge case handling**
   - In `src/duckbrain/writer.py`:
     - Wrap log append in try/except, append warning to result on failure
     - Wrap index update in try/except, append warning to result on failure
@@ -272,7 +272,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
     - Skip files without `item-type` in frontmatter (already handled in SP1-A2, verify)
   - **Run**: `uv run pytest tests/test_scanner.py tests/test_writer.py -v` → all PASS
 
-- [ ] **SP3-C3: Run full test suite**
+- [x] **SP3-C3: Run full test suite**
   - `uv run pytest tests/ -v` → all tests PASS, zero failures
   - **Commit**
 
