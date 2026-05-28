@@ -119,7 +119,11 @@ Make sure `uv` is on your `PATH`.
 
 ### Auto-Writing Session Learnings
 
-After connecting duckbrain, tell your agent to write learnings to your vault automatically. Add this to the appropriate instructions file:
+There are two ways to make your agent write learnings to the vault: instructions (works everywhere) or hooks (automatic, agent-native).
+
+#### Approach 1: Instructions (all agents)
+
+Add this to the appropriate instructions file. The agent reads it on startup and follows it during the session. **Tested with OpenCode.**
 
 **Claude Code** — add to `CLAUDE.md`:
 
@@ -141,23 +145,6 @@ save what you learned so you don't repeat mistakes:
 "instructions": ["/path/to/duckbrain/LEARNINGS.md"]
 ```
 
-Then create `LEARNINGS.md` with:
-
-```markdown
-## Session Learnings
-
-When you encounter problems, debug issues, or discover non-obvious solutions,
-save the learning to the vault so it's available in future sessions:
-
-- Append to today's daily note:
-  vault_write(kind="daily", title="short summary", content="what you learned", tags=["debugging", "learned"])
-
-- For reusable concepts/patterns worth revisiting:
-  vault_write(kind="concept", title="Concept Name", content="explanation", tags=["relevant", "tags"])
-
-Do this proactively — don't wait to be asked. A learning saved is a bug not repeated.
-```
-
 **Cursor** — add to `.cursorrules`:
 
 ```markdown
@@ -166,6 +153,43 @@ Do this proactively — don't wait to be asked. A learning saved is a bug not re
 After debugging or completing work, save learnings via duckbrain:
 - vault_write(kind="daily", title="<summary>", content="<details>", tags=[])
 - Use kind="concept" for reusable knowledge.
+```
+
+#### Approach 2: Hooks (automatic, no prompt engineering needed)
+
+Hooks run shell commands at specific lifecycle points — no instructions needed, they fire deterministically. **⚠️ Not tested with duckbrain yet.**
+
+**Claude Code** — supports a full [hooks system](https://code.claude.com/docs/en/hooks) including `SessionEnd` (fires when a session terminates). Add to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": "duckbrain-save-session --transcript-from-stdin"
+      }
+    ]
+  }
+}
+```
+
+The `SessionEnd` hook receives the full transcript on stdin. A wrapper script could pipe it through an LLM to extract learnings, then call `vault_write`. See [`agent-memory-mcp`](https://github.com/ipiton/agent-memory-mcp) for a production example of this pattern.
+
+**Cursor** — supports [hooks](https://cursor.com/docs/hooks.md) including `sessionEnd`, `postToolUse`, and `stop` via `.cursor/hooks.json`. However, `sessionEnd` is **not available in cloud agents** (local IDE only), and MCP execution hooks (`beforeMCPExecution`/`afterMCPExecution`) are **not yet wired for cloud agents**. Usable for local development, not for cloud-based Cursor sessions.
+
+**.cursor/hooks.json** (local IDE only):
+```json
+{
+  "hooks": {
+    "stop": [
+      {
+        "type": "command",
+        "command": "duckbrain-save-session --reason stop"
+      }
+    ]
+  }
+}
 ```
 
 ### How It Works
