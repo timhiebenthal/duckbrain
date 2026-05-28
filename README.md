@@ -26,11 +26,11 @@ DuckBrain fills that gap. It reads your vault as-is and writes new pages followi
                                                 │        │
                     query ┌─────────────────────┘        └── read/write ──┐
              (full index) ▼                                               ▼  (single file)
-         ┌──────────────────────┐                              ┌──────────────────────────┐
+         ┌──────────────────────┐                              ┌───────────────────────────┐
          │  DuckDB (in-memory)  │                              │    Your Obsidian Vault    │
          │                      │                              │                           │
-         │  pages (in-memory    │    synced on first query     │  wiki/entities/           │
-         │  snapshot)           │    persists in memory        │  wiki/concepts/           │
+         │  pages (in-memory    │    rebuilt from scratch      │  wiki/entities/           │
+         │  rebuilt every search)│    on every query           │  wiki/concepts/           │
          │  ┌───────────────┐   │                              │  wiki/sources/            │
          │  │ filepath      │   │                              │  wiki/synthesis/          │
          │  │ title         │   │                              │  daily/                   │
@@ -53,7 +53,7 @@ DuckBrain fills that gap. It reads your vault as-is and writes new pages followi
 ```
 
 - **Reads** your vault files directly — no index to sync, no watchers, no duplicate storage
-- **Searches** via DuckDB full-text search (BM25 ranking), built lazily in-memory on the first query
+- **Searches** via DuckDB full-text search (BM25 ranking), rebuilt fresh from disk on every query
 - **Writes** new pages with correct YAML frontmatter, auto-updating your index and log
 
 ## Requirements
@@ -370,8 +370,7 @@ If you use WSL2 with your vault on Windows, set it to the WSL mount path (e.g., 
 
 ## Performance
 
-- First query builds the FTS index (~90 pages scans in under a second)
-- Subsequent queries return in <200ms
+- FTS index rebuilt fresh from disk on every query — ~90 pages in under a second
 - Write operations complete in <500ms
 - Everything is in-memory — no persistent DuckDB database file
 - Zero network calls, zero external services
@@ -379,9 +378,19 @@ If you use WSL2 with your vault on Windows, set it to the WSL mount path (e.g., 
 ## Limitations (v1)
 
 - No update or delete operations (only create)
-- No vector embeddings or semantic search (see [abbreviation expansion](specs/2026-05-28-abbreviation-expansion/spec.md) for planned FTS improvements)
-- No file watchers — the FTS index is rebuilt from scratch on server restart
+- No vector embeddings or semantic search
 - No page deduplication check before writing
+- ~1s per search at current scale; at 500+ pages, incremental indexing would be needed
+
+## Under Consideration
+
+Ideas we're exploring but not committing to yet — as we use the tool and understand what matters, some of these may get built. Open an issue to discuss.
+
+- **Temporal decay (recency bias)** — boost search results from recently created or updated pages. Older knowledge fades unless explicitly referenced.
+- **Vector embeddings / semantic search** — cover the ~20% recall gap that BM25 can't reach (concepts with different wording). Could integrate MemSearch or local embeddings.
+- **Update and delete operations** — allow agents to edit or remove existing pages, not just create.
+- **Incremental indexing** — INSERT single pages into the FTS index instead of full rebuild, keeping search fast at 500+ pages.
+- **Page deduplication** — detect when a page with the same title already exists before writing.
 
 ## Inspirations
 
