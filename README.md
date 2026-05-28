@@ -50,18 +50,18 @@ This follows the schema defined in [AGENTS.md](https://x.com/karpathy/status/188
 ## Quick Start
 
 ```bash
-# 1. Clone and install
 git clone https://github.com/your-org/duckbrain.git
 cd duckbrain
 uv sync
-
-# 2. Start the server
-VAULT_PATH="/path/to/your/obsidian/vault" uv run duckbrain
 ```
 
-The server listens on stdio — it's ready for any MCP-compatible agent to connect.
+That's the install. To use it, **you don't run the server yourself** — your AI agent does. Add the config below, then just launch your agent as normal.
 
-> **Note:** `VAULT_PATH` only needs to be set as a system env var for standalone testing like this. When using MCP (next section), the config file's `env` field handles it.
+*(Optional: to verify the install, run `VAULT_PATH="/path/to/your/vault" uv run duckbrain`. It will appear to hang — that's correct, it's waiting on stdio. Press Ctrl+C to stop.)*
+
+## Connecting to Agents
+
+MCP stdio transport means the agent spawns duckbrain as a child process when it starts. You don't need a separate terminal or a running server. Just add this to your MCP config:
 
 ## Connecting to Agents
 
