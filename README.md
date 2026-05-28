@@ -347,14 +347,12 @@ If you use WSL2 with your vault on Windows, set it to the WSL mount path (e.g., 
 
 This project stands on the shoulders of several ideas and tools:
 
-- **[Andrej Karpathy's LLM wiki pattern](https://x.com/karpathy/status/1889054630119760374)** — the idea that a personal markdown wiki, co-maintained by humans and AI agents, compounds into a persistent knowledge base. The vault schema (entities, concepts, sources, synthesis, daily log) is directly inspired by this.
+- **[Andrej Karpathy's LLM wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** — the idea that a personal markdown wiki, co-maintained by humans and AI agents, compounds into a persistent knowledge base. The vault schema (entities, concepts, sources, synthesis, daily log) is directly inspired by this.
 - **[DuckDB](https://duckdb.org/)** — the embedded analytical database that makes full-text search over flat files viable without a server, index sync, or persistent storage. The decision to use in-memory FTS instead of a vector database was a deliberate trade-off for simplicity.
 - **[Obsidian](https://obsidian.md/)** — the local-first, markdown-native note-taking tool that treats your files as the truth. duckbrain exists because Obsidian vaults deserve tooling that respects the filesystem.
 - **[MemSearch](https://github.com/zilliztech/memsearch)** and **[Open Brain (OB1)](https://github.com/NateBJones-Projects/OB1)** — early experiments in cross-tool agent memory that demonstrated the *need* for structured vault write-back while choosing different architectures. Their strengths and gaps directly informed duckbrain's design.
-- **[Agent Memory Systems (6-level taxonomy)](https://www.youtube.com/watch?v=...)** — Simon Scrapes' comprehensive comparison of Claude Code memory approaches provided the framework for understanding where duckbrain fits in the ecosystem (Level 6: cross-tool MCP with dedicated server).
+- **[Agent Memory Systems (6-level taxonomy)](https://www.youtube.com/watch?v=UHVFcUzAGlM)** — Simon Scrapes' comprehensive comparison of Claude Code memory approaches provided the framework for understanding where duckbrain fits in the ecosystem (Level 6: cross-tool MCP with dedicated server).
 - **[trellis-datamodel](https://github.com/timhiebenthal/trellis-datamodel)** — the same author's data modeling tool whose CI/CD patterns (trusted PyPI publishing, version-diff release detection, Keep a Changelog) were borrowed for this project's repository readiness.
-- **[uv](https://docs.astral.sh/uv/)** — the Python package manager that made the development workflow (and the MCP launch command) trivially reproducible.
-- **[FastMCP](https://github.com/jlowin/fastmcp)** — the high-level MCP Python SDK that reduced server boilerplate to a decorator.
 
 The core decision — **build, don't integrate** — came from a [structured comparison](https://github.com/timhiebenthal/duckbrain/blob/main/specs/2026-05-28-duckdb-memory-mcp/spec.md) of 7 existing tools. All failed on one requirement: vault schema-aware write-back. Rather than fork or extend, duckbrain started from first principles: what's the simplest thing that gives agents structured read/write access to an Obsidian vault? The answer was DuckDB + MCP + ~500 lines of Python.
 
