@@ -12,25 +12,44 @@ Existing agent memory tools (MemSearch, Open Brain, Mem0, Supermemory) treat mem
 
 DuckBrain fills that gap. It reads your vault as-is and writes new pages following your vault's schema, so your wiki stays a single source of truth on the filesystem.
 
-## How it works
+## How it works (Architecture)
 
 ```
-AI Agent (Claude Code / OpenCode / Hermes)
-        │
-        │ MCP stdio
-        ▼
-┌──────────────────────┐
-│   DuckBrain server   │
-│                      │
-│  vault_info   ──►    │──► DuckDB FTS (in-memory)
-│  vault_search ──►    │
-│  vault_read   ──►    │──► Filesystem reads
-│  vault_write  ──►    │──► Filesystem writes
-└──────────────────────┘
-        │
-        ▼
-   Your Obsidian vault
-   (plain markdown on disk)
+┌──────────────────┐     MCP stdio     ┌─────────────────────────────────┐
+│    AI Agent      │ ◄──────────────►  │      DuckBrain MCP Server       │
+│                  │                   │                                 │
+│  Claude Code     │                   │  vault_info  ──┐                │
+│  OpenCode        │                   │  vault_search ─┤  DuckDB FTS    │
+│  Cursor          │                   │  vault_read  ──┤  Filesystem    │
+│  Hermes          │                   │  vault_write ──┘  Filesystem    │
+└──────────────────┘                   └────────┬────────┬───────────────┘
+                                                │        │
+                    query ┌─────────────────────┘        └── read/write ──┐
+             (full index) ▼                                               ▼  (single file)
+         ┌──────────────────────┐                              ┌──────────────────────────┐
+         │  DuckDB (in-memory)  │                              │    Your Obsidian Vault    │
+         │                      │                              │                           │
+         │  pages (in-memory    │    synced on first query     │  wiki/entities/           │
+         │  snapshot)           │    persists in memory        │  wiki/concepts/           │
+         │  ┌───────────────┐   │                              │  wiki/sources/            │
+         │  │ filepath      │   │                              │  wiki/synthesis/          │
+         │  │ title         │   │                              │  daily/                   │
+         │  │ kind          │   │                              │  wiki/index.md            │
+         │  │ tags          │   │                              │  wiki/log.md              │
+         │  │ body          │   │                              │                           │
+         │  │ created       │   │                              │  plain markdown on disk   │
+         │  │ updated       │   │                              │                           │
+         │  └───────────────┘   │                              │                           │
+         │                      │                              │                           │
+         │  BM25 search query:  │                              │                           │
+         │  SELECT ...          │                              │                           │
+         │  FROM pages p        │                              │                           │
+         │  WHERE fts_match_bm25│                              │                           │
+         │    (p.filepath,      │                              │                           │
+         │     'segfault')      │                              │                           │
+         │  AND kind='concept'  │                              │                           │
+         │  ORDER BY score DESC │                              │                           │
+         └──────────────────────┘                              └───────────────────────────┘
 ```
 
 - **Reads** your vault files directly — no index to sync, no watchers, no duplicate storage
