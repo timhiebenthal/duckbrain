@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Check that pyproject.toml version matches the GitHub Release tag."""
 
+import os
 import re
 import sys
-import os
 
 
 def get_version_from_pyproject():

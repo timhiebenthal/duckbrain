@@ -3,7 +3,6 @@
 from datetime import date
 from pathlib import Path
 
-
 # ── slugify tests ──────────────────────────────────────────────────────────────
 
 
@@ -201,7 +200,6 @@ def test_write_page_concept_section(temp_vault: Path) -> None:
     # Should be under Concepts, not Entities
     assert "- [[Test Concept]] - Test Concept" in index
     # Find which section it's under
-    entities_idx = index.index("## Entities")
     concepts_idx = index.index("## Concepts")
     concept_entry_idx = index.index("- [[Test Concept]] - Test Concept")
     # The entry should be after ## Concepts, not after ## Entities
@@ -414,7 +412,7 @@ def test_write_daily_updates_log(temp_vault: Path) -> None:
     """Daily writes still update the log."""
     from duckbrain.writer import write_page
 
-    result = write_page(
+    write_page(
         str(temp_vault), "daily", "Daily log test",
         "Testing log update.",
         ["test"],

@@ -1,6 +1,6 @@
 # duckbrain
 
-DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents structured read and write access to your personal wiki — with full-text search, frontmatter-aware indexing, and automatic index/log updates.
+DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents structured read and write access to your personal wiki — with full-text search, frontmatter-aware indexing, and automatic index/log updates. Built on the principle that your vault filesystem should be the single source of truth, not a database hidden behind an API.
 
 ## What it solves
 
@@ -15,13 +15,14 @@ AI Agent (Claude Code / OpenCode / Hermes)
         │
         │ MCP stdio
         ▼
-┌─────────────────────┐
-│   duckbrain server  │
-│                     │
-│  vault_info   ──►   │──► DuckDB FTS (in-memory)
-│  vault_search ──►   │
-│  vault_write  ──►   │──► Filesystem writes
-└─────────────────────┘
+┌──────────────────────┐
+│   duckbrain server   │
+│                      │
+│  vault_info   ──►    │──► DuckDB FTS (in-memory)
+│  vault_search ──►    │
+│  vault_read   ──►    │──► Filesystem reads
+│  vault_write  ──►    │──► Filesystem writes
+└──────────────────────┘
         │
         ▼
    Your Obsidian vault
@@ -34,7 +35,7 @@ AI Agent (Claude Code / OpenCode / Hermes)
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.10+
 - [uv](https://docs.astral.sh/uv/) (package manager)
 - An Obsidian vault structured with a `wiki/` directory containing:
   - `wiki/entities/` — people, orgs, products, tools
@@ -45,27 +46,31 @@ AI Agent (Claude Code / OpenCode / Hermes)
   - `wiki/log.md` — append-only chronological record
 - Pages should use YAML frontmatter: `title`, `item-type`, `tags`, `created`, `updated`
 
-This follows the schema defined in [AGENTS.md](https://x.com/karpathy/status/1889054630119760374). If your vault uses a different structure, duckbrain works with it — but index/log updates expect the section headers above.
+This follows the schema defined for [LLM wikis](https://x.com/karpathy/status/1889054630119760374). If your vault uses a different structure, duckbrain works with it — but index/log updates expect the section headers above.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/duckbrain.git
+pip install duckbrain
+```
+
+That's it. Now connect your AI agent (see below) — you don't run duckbrain yourself, the agent spawns it as needed.
+
+*(Optional: verify the install by running `duckbrain` — it'll fail with "VAULT_PATH not set", which confirms it's working.)*
+
+### Installing from source (for contributors)
+
+```bash
+git clone https://github.com/timhiebenthal/duckbrain.git
 cd duckbrain
 uv sync
 ```
-
-That's the install. To use it, **you don't run the server yourself** — your AI agent does. Add the config below, then just launch your agent as normal.
 
 *(Optional: to verify the install, run `VAULT_PATH="/path/to/your/vault" uv run duckbrain`. It will appear to hang — that's correct, it's waiting on stdio. Press Ctrl+C to stop.)*
 
 ## Connecting to Agents
 
 MCP stdio transport means the agent spawns duckbrain as a child process when it starts. You don't need a separate terminal or a running server. Just add this to your MCP config:
-
-## Connecting to Agents
-
-Add this to your MCP config (replace the vault path):
 
 ```json
 {
@@ -302,11 +307,25 @@ If you use WSL2 with your vault on Windows, set it to the WSL mount path (e.g., 
 
 ## Limitations (v1)
 
-- Read-only search covers `wiki/` only (not `daily/` or other vault files)
 - No update or delete operations (only create)
-- No vector embeddings or semantic search
+- No vector embeddings or semantic search (see [abbreviation expansion](specs/2026-05-28-abbreviation-expansion/spec.md) for planned FTS improvements)
 - No file watchers — the FTS index is rebuilt from scratch on server restart
 - No page deduplication check before writing
+
+## Inspirations
+
+This project stands on the shoulders of several ideas and tools:
+
+- **[Andrej Karpathy's LLM wiki pattern](https://x.com/karpathy/status/1889054630119760374)** — the idea that a personal markdown wiki, co-maintained by humans and AI agents, compounds into a persistent knowledge base. The vault schema (entities, concepts, sources, synthesis, daily log) is directly inspired by this.
+- **[DuckDB](https://duckdb.org/)** — the embedded analytical database that makes full-text search over flat files viable without a server, index sync, or persistent storage. The decision to use in-memory FTS instead of a vector database was a deliberate trade-off for simplicity.
+- **[Obsidian](https://obsidian.md/)** — the local-first, markdown-native note-taking tool that treats your files as the truth. duckbrain exists because Obsidian vaults deserve tooling that respects the filesystem.
+- **[MemSearch](https://github.com/zilliztech/memsearch)** and **[Open Brain (OB1)](https://github.com/NateBJones-Projects/OB1)** — early experiments in cross-tool agent memory that demonstrated the *need* for structured vault write-back while choosing different architectures. Their strengths and gaps directly informed duckbrain's design.
+- **[Agent Memory Systems (6-level taxonomy)](https://www.youtube.com/watch?v=...)** — Simon Scrapes' comprehensive comparison of Claude Code memory approaches provided the framework for understanding where duckbrain fits in the ecosystem (Level 6: cross-tool MCP with dedicated server).
+- **[trellis-datamodel](https://github.com/timhiebenthal/trellis-datamodel)** — the same author's data modeling tool whose CI/CD patterns (trusted PyPI publishing, version-diff release detection, Keep a Changelog) were borrowed for this project's repository readiness.
+- **[uv](https://docs.astral.sh/uv/)** — the Python package manager that made the development workflow (and the MCP launch command) trivially reproducible.
+- **[FastMCP](https://github.com/jlowin/fastmcp)** — the high-level MCP Python SDK that reduced server boilerplate to a decorator.
+
+The core decision — **build, don't integrate** — came from a [structured comparison](https://github.com/timhiebenthal/duckbrain/blob/main/specs/2026-05-28-duckdb-memory-mcp/spec.md) of 7 existing tools. All failed on one requirement: vault schema-aware write-back. Rather than fork or extend, duckbrain started from first principles: what's the simplest thing that gives agents structured read/write access to an Obsidian vault? The answer was DuckDB + MCP + ~500 lines of Python.
 
 ## License
 

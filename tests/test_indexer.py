@@ -1,8 +1,8 @@
 """Tests for duckbrain.indexer — DuckDB FTS index build + search + stats."""
 
 import pytest
-from duckbrain import PageMetadata
 
+from duckbrain import PageMetadata
 
 # ── build_fts_index tests ─────────────────────────────────────────────────────
 

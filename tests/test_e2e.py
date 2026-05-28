@@ -12,7 +12,9 @@ import time
 from pathlib import Path
 
 
-def _mcp_request_line(server_proc: subprocess.Popen, method: str, params: dict | None = None) -> dict:
+def _mcp_request_line(
+    server_proc: subprocess.Popen, method: str, params: dict | None = None
+) -> dict:
     """Send a JSON-RPC request to the MCP server via stdio and return the response.
 
     Uses a static incrementing request ID.

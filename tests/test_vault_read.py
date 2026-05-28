@@ -1,6 +1,5 @@
 """Tests for vault_read tool."""
 
-import json
 from pathlib import Path
 
 from duckbrain.tools.vault_read import handle_vault_read

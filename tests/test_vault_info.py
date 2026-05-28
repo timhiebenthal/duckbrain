@@ -1,7 +1,6 @@
 """Tests for duckbrain.tools.vault_info — vault structure summary."""
 
 from pathlib import Path
-import pytest
 
 
 def test_vault_info_returns_counts(temp_vault: Path) -> None:

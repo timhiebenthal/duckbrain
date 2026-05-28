@@ -1,7 +1,9 @@
 """Test fixtures for duckbrain."""
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from duckbrain import PageMetadata
 
 
@@ -57,7 +59,8 @@ updated: 2026-05-28
 
 # Claude Mem
 
-Claude Mem is an MCP-based memory plugin that provides persistent memory across sessions for OpenCode.
+Claude Mem is an MCP-based memory plugin that provides persistent memory \
+across sessions for OpenCode.
 """
     (wiki / "entities" / "claude-mem.md").write_text(entity_claude_mem)
 
@@ -72,7 +75,8 @@ updated: 2026-05-28
 
 # Agent Memory Systems
 
-A 6-level taxonomy of Claude Code memory approaches. Includes DuckDB Zero-ETL, Memweave/SQLite, and RushDB graph+vector implementations.
+A 6-level taxonomy of Claude Code memory approaches. Includes DuckDB Zero-ETL, \
+Memweave/SQLite, and RushDB graph+vector implementations.
 """
     (wiki / "concepts" / "agent-memory-systems.md").write_text(concept_memory)
 
@@ -136,7 +140,10 @@ def sample_pages() -> list[PageMetadata]:
             title="Claude Mem",
             kind="entity",
             tags=["open-source", "ai", "memory", "mcp"],
-            body="Claude Mem is an MCP-based memory plugin that provides persistent memory across sessions for OpenCode.",
+            body=(
+                "Claude Mem is an MCP-based memory plugin that provides persistent memory "
+                "across sessions for OpenCode."
+            ),
             created="2026-05-28",
             updated="2026-05-28",
         ),
@@ -154,7 +161,10 @@ def sample_pages() -> list[PageMetadata]:
             title="Jagged Frontier",
             kind="concept",
             tags=["ai", "llm", "capability"],
-            body="Uneven LLM capability across tasks — some things are easy for AI, others unexpectedly hard.",
+            body=(
+                "Uneven LLM capability across tasks — some things are easy "
+                "for AI, others unexpectedly hard."
+            ),
             created="2026-05-04",
             updated="2026-05-20",
         ),
@@ -163,7 +173,10 @@ def sample_pages() -> list[PageMetadata]:
             title="duckdb-memory-mcp-build-decision",
             kind="synthesis",
             tags=["agent-memory", "duckdb", "mcp", "comparison"],
-            body="Verdict: Build a minimal DuckDB MCP server. Existing tools fail on vault schema-aware write-back.",
+            body=(
+                "Verdict: Build a minimal DuckDB MCP server. Existing tools fail "
+                "on vault schema-aware write-back."
+            ),
             created="2026-05-28",
             updated="2026-05-28",
         ),

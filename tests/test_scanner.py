@@ -1,9 +1,6 @@
 """Tests for duckbrain.scanner — vault file discovery and frontmatter parsing."""
 
 from pathlib import Path
-import pytest
-from duckbrain import PageMetadata
-
 
 # ── scan_vault tests ──────────────────────────────────────────────────────────
 
@@ -44,7 +41,6 @@ def test_scan_vault_excludes_non_wiki(temp_vault: Path) -> None:
     junk.write_text("# Just a note\n\nNo frontmatter here.\n")
 
     pages = scan_vault(str(temp_vault))
-    titles = [p.title for p in pages]
     assert "junk.md" not in [p.filepath for p in pages]
     assert len(pages) == 6  # 5 wiki + 1 daily
 
