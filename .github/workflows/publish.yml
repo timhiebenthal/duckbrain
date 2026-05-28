@@ -1,0 +1,87 @@
+name: Release & Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      skip: ${{ steps.resolve.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve version
+        id: resolve
+        run: |
+          NEW=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
+          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | cut -d'"' -f2 || echo "")
+          echo "version=$NEW" >> $GITHUB_OUTPUT
+          if [ -z "$NEW" ] || [ "$NEW" == "$OLD" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          elif git ls-remote --tags origin "v$NEW" | grep -q "v$NEW"; then
+            echo "Tag v$NEW already exists — skipping." >&2
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: steps.resolve.outputs.skip == 'false'
+        run: |
+          gh release create "v${{ steps.resolve.outputs.version }}" \
+            --title "v${{ steps.resolve.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: release
+    if: needs.release.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Version check
+        env:
+          RELEASE_TAG: v${{ needs.release.outputs.version }}
+        run: uv run python scripts/check_version.py
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
