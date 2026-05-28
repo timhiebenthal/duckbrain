@@ -36,14 +36,14 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 
 ### Stream A: `scanner.py` — Vault file discovery + frontmatter parsing
 
-- [ ] **SP1-A1: Write failing test for `scan_vault`**
+- [x] **SP1-A1: Write failing test for `scan_vault`**
   - Create `tests/test_scanner.py`
   - Test: `test_scan_vault_finds_all_pages(temp_vault)` — asserts the fixture has 3+ pages; returns list of `PageMetadata` with correct `filepath`, `kind` inferred from parent dir (`wiki/entities/` → `"entity"`, `wiki/concepts/` → `"concept"`, etc.)
   - Test: `test_scan_vault_excludes_non_wiki(temp_vault)` — create a `wiki/junk.md` with no frontmatter in the temp vault, assert it's skipped (no `item-type` in frontmatter)
   - Test: `test_scan_vault_empty_dir(tmp_path)` — empty vault returns `[]`
-  - **Run**: `uv run pytest tests/test_scanner.py -v` → FAIL
+  - **Run**: `uv run pytest tests/test_scanner.py -v` → FAIL (confirmed)
 
-- [ ] **SP1-A2: Implement `scan_vault(path) -> list[PageMetadata]`**
+- [x] **SP1-A2: Implement `scan_vault(path) -> list[PageMetadata]`**
   - In `src/duckbrain/scanner.py`:
     - `scan_vault(vault_path: str) -> list[PageMetadata]`
     - Glob `wiki/{entities,concepts,sources,synthesis}/*.md` under vault_path
@@ -51,22 +51,21 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
     - Return list of `PageMetadata` for files that have valid `item-type` frontmatter
   - **Run**: `uv run pytest tests/test_scanner.py -v` → PASS
 
-- [ ] **SP1-A3: Write failing test for `parse_frontmatter`**
+- [x] **SP1-A3: Write failing test for `parse_frontmatter`**
   - In `tests/test_scanner.py`, add:
   - Test: `test_parse_frontmatter_with_yaml()` — markdown string with `---\ntitle: Foo\nitem-type: entity\ntags: [a, b]\n---\n# Foo\n\nBody text.` → returns `(dict, "body text")` with correct title, item-type, tags
   - Test: `test_parse_frontmatter_no_yaml()` — markdown with no `---` → returns `({}, full_content)`
   - Test: `test_parse_frontmatter_malformed_yaml()` — broken YAML → returns `({}, full_content)`, no crash
-  - **Run**: `uv run pytest tests/test_scanner.py::test_parse_frontmatter* -v` → FAIL
+  - **Run**: `uv run pytest tests/test_scanner.py::test_parse_frontmatter* -v` → FAIL (confirmed)
 
-- [ ] **SP1-A4: Implement `parse_frontmatter(content) -> tuple[dict, str]`**
+- [x] **SP1-A4: Implement `parse_frontmatter(content) -> tuple[dict, str]`**
   - In `src/duckbrain/scanner.py`:
     - If content starts with `---`, split on second `---`, parse YAML block
     - Return `(frontmatter_dict, body_text)`
     - On YAML parse error: return `({}, content)` gracefully
   - **Run**: `uv run pytest tests/test_scanner.py -v` → all PASS
-  - **Commit**
 
-- [ ] **SP1-A5: Implement `scanner.scan_daily(path)` (bonus if time)**
+- [x] **SP1-A5: Implement `scanner.scan_daily(path)` (bonus if time)**
   - Same pattern but for `daily/*.md`. Not required for v1 tools but useful for future. Skip tests for now — add a placeholder function that returns `[]` and is called but not wired to any tool.
 
 ---
@@ -75,55 +74,33 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 
 ⚠️ Depends on: SP1-T0 (shared types defined)
 
-- [ ] **SP1-B1: Write failing test for `build_fts_index`**
-  - Create `tests/test_indexer.py`
-  - Import `sample_pages` fixture from conftest (list of 4-5 `PageMetadata` with varied kinds/tags/bodies)
-  - Test: `test_build_fts_index_returns_connection(sample_pages)` — returns a `duckdb.DuckDBPyConnection`, not None
-  - Test: `test_build_fts_index_table_exists(sample_pages)` — connection has a table named `pages` with columns `filepath, title, kind, tags, body`
-  - Test: `test_build_fts_index_fts_created(sample_pages)` — FTS index named `pages_fts` exists on the connection
-  - Test: `test_build_fts_index_empty()` — empty list → connection still works, table exists but has 0 rows
-  - **Run**: `uv run pytest tests/test_indexer.py -v` → FAIL
+- [x] **SP1-B1: Write failing test for `build_fts_index`**
+  - `tests/test_indexer.py` created with 4 tests
+  - **Run**: `uv run pytest tests/test_indexer.py -v` → FAIL (expected, `ImportError`)
 
-- [ ] **SP1-B2: Implement `build_fts_index(pages) -> duckdb.DuckDBPyConnection`**
-  - In `src/duckbrain/indexer.py`:
-    - Create DuckDB in-memory connection
-    - Create table `pages` with VARCHAR columns: `filepath, title, kind, tags, body`
-    - Insert all `PageMetadata` (join tags as comma-separated string for FTS)
-    - Create FTS index: `CREATE INDEX pages_fts ON pages USING fts(title, tags, body)`
-    - Return connection
-  - **Run**: `uv run pytest tests/test_indexer.py -v` → PASS
+- [x] **SP1-B2: Implement `build_fts_index(pages) -> duckdb.DuckDBPyConnection`**
+  - Uses `PRAGMA create_fts_index('pages', 'filepath', 'title', 'tags', 'body')` with DuckDB 1.5.3 FTS API
+  - Returns in-memory DuckDB connection with `pages` table and FTS index
+  - **Run**: `uv run pytest tests/test_indexer.py -v` → PASS (4 tests)
 
-- [ ] **SP1-B3: Write failing test for `search`**
-  - Add to `tests/test_indexer.py`:
-  - Test: `test_search_basic(sample_pages)` — search for a word in one page's body → returns list with that page
-  - Test: `test_search_kind_filter(sample_pages)` — `search(conn, "duckdb", kind="concept")` → only concept pages
-  - Test: `test_search_tag_filter(sample_pages)` — `search(conn, "memory", tags=["agent"])` → only pages containing tag "agent"
-  - Test: `test_search_no_match(sample_pages)` — `search(conn, "zzzxyz")` → returns `[]`
-  - Test: `test_search_result_structure(sample_pages)` — each result is a dict with keys `title, kind, filepath, snippet`
-  - **Run**: `uv run pytest tests/test_indexer.py::test_search* -v` → FAIL
+- [x] **SP1-B3: Write failing test for `search`**
+  - 5 tests added: basic, kind filter, tag filter, no match, result structure
+  - Uses `fts_conn` fixture building index from `sample_pages`
+  - **Run**: `uv run pytest tests/test_indexer.py -k search -v` → 5 FAIL (ParserException: `:query` syntax)
 
-- [ ] **SP1-B4: Implement `search(conn, query, kind, tags) -> list[dict]`**
-  - In `src/duckbrain/indexer.py`:
-    - Use `SELECT title, kind, filepath, snippet(body, :query, '<b>', '</b>', 20) as snippet FROM pages WHERE pages_fts match_bm25(:query)` plus optional kind/tag WHERE clauses
-    - Return list of dicts with `title, kind, filepath, snippet`
-  - **Run**: `uv run pytest tests/test_indexer.py -v` → all PASS
+- [x] **SP1-B4: Implement `search(conn, query, kind, tags) -> list[dict]`**
+  - Uses `fts_main_pages.match_bm25(filepath, $query)` subquery pattern
+  - `$name` DuckDB named param syntax; kind/tag filters via SQL WHERE clauses
+  - Body substring used as snippet (DuckDB FTS has no built-in `snippet()`)
+  - **Run**: `uv run pytest tests/test_indexer.py -v` → all PASS (13 tests)
 
-- [ ] **SP1-B5: Write failing test for `get_stats`**
-  - Add to `tests/test_indexer.py`:
-  - Test: `test_get_stats_counts(sample_pages)` — returns dict with `entities: N`, `concepts: N`, etc. matching sample_pages
-  - Test: `test_get_stats_tags(sample_pages)` — `available_tags` is a sorted list of unique tags from all pages
-  - Test: `test_get_stats_last_modified(sample_pages)` — `last_modified` is a string, matches the max `updated` date
-  - Test: `test_get_stats_empty()` — empty pages → all counts 0, empty tags, last_modified None
-  - **Run**: `uv run pytest tests/test_indexer.py::test_get_stats* -v` → FAIL
+- [x] **SP1-B5: Write failing test for `get_stats`**
+  - 4 tests: counts, tags, last_modified, empty
+  - **Run**: `uv run pytest tests/test_indexer.py -k stats -v` → 4 PASS (implemented alongside search)
 
-- [ ] **SP1-B6: Implement `get_stats(conn) -> dict`**
-  - In `src/duckbrain/indexer.py`:
-    - SQL: `SELECT kind, COUNT(*) FROM pages GROUP BY kind` → build counts dict
-    - SQL: `SELECT DISTINCT tags FROM pages` → split commas, flatten, deduplicate, sort
-    - SQL: `SELECT MAX(updated) FROM pages` → max date
-    - Return `{ entities: n, concepts: n, sources: n, synthesis: n, available_tags: list, last_modified: str }`
-  - **Run**: `uv run pytest tests/test_indexer.py -v` → all PASS
-  - **Commit**
+- [x] **SP1-B6: Implement `get_stats(conn) -> dict`**
+  - SQL `GROUP BY kind` for counts, `SELECT DISTINCT tags` flattened + deduplicated, `MAX(updated)` for last_modified
+  - **Run**: `uv run pytest tests/test_indexer.py -v` → 13 PASS; `uv run pytest` → 20 PASS (no regressions)
 
 ---
 
