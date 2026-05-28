@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from duckbrain.tools.vault_info import handle_vault_info
+from duckbrain.tools.vault_read import handle_vault_read
 from duckbrain.tools.vault_search import handle_vault_search
 from duckbrain.tools.vault_write import handle_vault_write
 
@@ -35,6 +36,11 @@ def main() -> None:
     def vault_info() -> dict:
         """Get vault structure stats: page counts by kind, available tags, last modified date."""
         return handle_vault_info(vault_path)
+
+    @server.tool()
+    def vault_read(title: str) -> dict:
+        """Read a wiki or daily page by title. Returns full markdown content with metadata."""
+        return handle_vault_read(vault_path, title)
 
     @server.tool()
     def vault_search(
