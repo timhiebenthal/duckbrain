@@ -1,5 +1,9 @@
 # duckbrain
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/logo_writing_white_bg.png" alt="DuckBrain" width="500" />
+</p>
+
 DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents structured read and write access to your personal wiki — with full-text search, frontmatter-aware indexing, and automatic index/log updates. Built on the principle that your vault filesystem should be the single source of truth, not a database hidden behind an API.
 
 ## What it solves
