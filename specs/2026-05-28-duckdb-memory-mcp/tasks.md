@@ -110,44 +110,46 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 
 ### Stream A: `tools/vault_info.py` — MCP tool for vault structure summary
 
-- [ ] **SP2-A1: Write failing test**
+- [x] **SP2-A1: Write failing test**
   - Create `tests/test_vault_info.py`
   - Use `temp_vault` fixture. Call scanner + indexer to build the index, then test the info output.
   - Test: `test_vault_info_returns_counts(temp_vault)` — scan vault, build index, call function that returns info dict; verify counts match actual files in temp_vault
   - Test: `test_vault_info_includes_tags(temp_vault)` — available_tags list is non-empty, matches tags in fixture pages
-  - **Run**: `uv run pytest tests/test_vault_info.py -v` → FAIL
+  - **Run**: `uv run pytest tests/test_vault_info.py -v` → FAIL (confirmed: 4 failed with ModuleNotFoundError)
 
-- [ ] **SP2-A2: Implement `vault_info` tool logic**
+- [x] **SP2-A2: Implement `vault_info` tool logic**
   - In `src/duckbrain/tools/vault_info.py`:
     - Function `handle_vault_info(vault_path: str) -> dict`:
       - Calls `scan_vault(vault_path)` → `build_fts_index(pages)` → `get_stats(conn)` → returns the dict
-    - Register as MCP tool with schema: no required params.
-  - **Run**: `uv run pytest tests/test_vault_info.py -v` → PASS
+    - DuckDB connection is properly closed after get_stats to avoid resource leaks.
+  - **Run**: `uv run pytest tests/test_vault_info.py -v` → PASS (4 passed)
+  - **Run**: `uv run pytest` → 27 passed (no regressions)
 
 ---
 
 ### Stream B: `tools/vault_search.py` — MCP tool for FTS queries
 
-- [ ] **SP2-B1: Write failing test**
+- [x] **SP2-B1: Write failing test**
   - Create `tests/test_vault_search.py`
   - Use `temp_vault` fixture with pages containing "agent memory" in body text.
-  - Test: `test_vault_search_finds_content(temp_vault)` — search for "agent" returns pages containing that word
+  - Test: `test_vault_search_finds_content(temp_vault)` — search for "memory" returns pages containing that word
   - Test: `test_vault_search_kind_filter(temp_vault)` — search with `kind="concept"` returns only concept-type results
   - Test: `test_vault_search_no_results(temp_vault)` — search for "zzzxyz" returns empty list
-  - **Run**: `uv run pytest tests/test_vault_search.py -v` → FAIL
+  - **Run**: `uv run pytest tests/test_vault_search.py -v` → FAIL (confirmed, ModuleNotFoundError)
 
-- [ ] **SP2-B2: Implement `vault_search` tool logic**
+- [x] **SP2-B2: Implement `vault_search` tool logic**
   - In `src/duckbrain/tools/vault_search.py`:
     - Function `handle_vault_search(vault_path, query, kind, tags) -> list[dict]`:
       - Calls `scan_vault(vault_path)` → `build_fts_index(pages)` → `search(conn, query, kind, tags)` → returns results
-    - Register as MCP tool with schema: `query` (required str), `kind` (optional, enum), `tags` (optional list of str)
-  - **Run**: `uv run pytest tests/test_vault_search.py -v` → PASS
+      - IMPORTANT: close the DuckDB connection after search to avoid resource leaks
+  - **Run**: `uv run pytest tests/test_vault_search.py -v` → PASS (3/3)
+  - **Run**: `uv run pytest` → 27 passed (no regressions)
 
 ---
 
 ### Stream C: `writer.py` + `tools/vault_write.py` — Page creation + index/log update
 
-- [ ] **SP2-C1: Write failing test for `slugify`**
+- [x] **SP2-C1: Write failing test for `slugify`**
   - In `tests/test_writer.py` (create it):
   - Test: `test_slugify_basic()` — `"Claude Mem"` → `"claude-mem"`
   - Test: `test_slugify_special_chars()` — `"BI's Second Unbundling"` → `"bis-second-unbundling"`
@@ -155,19 +157,19 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
   - Test: `test_slugify_multiple_spaces()` — `"Agent   Memory"` → `"agent-memory"`
   - **Run**: `uv run pytest tests/test_writer.py::test_slugify* -v` → FAIL
 
-- [ ] **SP2-C2: Implement `slugify(title) -> str`**
+- [x] **SP2-C2: Implement `slugify(title) -> str`**
   - In `src/duckbrain/writer.py`:
     - lowercase, replace non-alphanumeric (except spaces) with `-`, collapse multiple dashes/spaces to single dash, strip leading/trailing dashes
   - **Run**: `uv run pytest tests/test_writer.py::test_slugify* -v` → PASS
 
-- [ ] **SP2-C3: Write failing test for `generate_frontmatter`**
+- [x] **SP2-C3: Write failing test for `generate_frontmatter`**
   - In `tests/test_writer.py`:
   - Test: `test_generate_frontmatter_entity()` — `generate_frontmatter("entity", "Claude Mem", ["ai", "memory"])` → YAML block with title, item-type: entity, tags: [ai, memory], created, updated
   - Test: `test_generate_frontmatter_concept()` — kind "concept" → item-type: concept
   - Test: `test_generate_frontmatter_numeric_tag()` — tags with numbers handled correctly (tags are strings in YAML)
   - **Run**: `uv run pytest tests/test_writer.py::test_generate_frontmatter* -v` → FAIL
 
-- [ ] **SP2-C4: Implement `generate_frontmatter(kind, title, tags) -> str`**
+- [x] **SP2-C4: Implement `generate_frontmatter(kind, title, tags) -> str`**
   - In `src/duckbrain/writer.py`:
     - Build YAML dict with keys: title, item-type, tags, created, updated
     - Use today's date (YYYY-MM-DD) for created/updated
@@ -175,7 +177,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
     - Use `yaml.dump` with `default_flow_style=None` for readable output
   - **Run**: `uv run pytest tests/test_writer.py::test_generate_frontmatter* -v` → PASS
 
-- [ ] **SP2-C5: Write failing test for `write_page`**
+- [x] **SP2-C5: Write failing test for `write_page`**
   - In `tests/test_writer.py`:
   - Test: `test_write_page_creates_file(temp_vault)` — write entity "Test Entity" → `wiki/entities/test-entity.md` exists with correct frontmatter and content body
   - Test: `test_write_page_updates_index(temp_vault)` — after write, `wiki/index.md` contains `[[Test Entity]]` in the Entities section
@@ -185,7 +187,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
   - Test: `test_write_page_index_append_not_overwrite(temp_vault)` — existing index entries survive; new entry is appended
   - **Run**: `uv run pytest tests/test_writer.py::test_write_page* -v` → FAIL
 
-- [ ] **SP2-C6: Implement `write_page(vault_path, kind, title, content, tags) -> dict`**
+- [x] **SP2-C6: Implement `write_page(vault_path, kind, title, content, tags) -> dict`**
   - In `src/duckbrain/writer.py`:
     1. Derive slug from title → filename
     2. Map kind to subdirectory: `entity` → `wiki/entities/`, `concept` → `wiki/concepts/`, `source` → `wiki/sources/`, `synthesis` → `wiki/synthesis/`
@@ -197,7 +199,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
     - If any step after file write fails, include that as a warning in the result but don't roll back the file.
   - **Run**: `uv run pytest tests/test_writer.py -v` → all PASS
 
-- [ ] **SP2-C7: Implement `vault_write` tool (thin wrapper)**
+- [x] **SP2-C7: Implement `vault_write` tool (thin wrapper)**
   - In `src/duckbrain/tools/vault_write.py`:
     - Function `handle_vault_write(vault_path, kind, title, content, tags) -> dict`
     - Calls `write_page(vault_path, kind, title, content, tags)`
