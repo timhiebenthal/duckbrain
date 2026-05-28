@@ -21,7 +21,7 @@ A minimal MCP server that gives AI coding agents (Hermes Agent, OpenCode, Claude
 - **FR-6**: YAML frontmatter parsing — extract `title`, `item-type`, `tags`, `sources`, `created`, `updated` from each page for FTS indexing and filtering.
 - **FR-7**: YAML frontmatter generation — for `vault_write`, produce correct frontmatter with `title`, `item-type`, `tags`, `created` (today's date), `updated` (today's date).
 - **FR-8**: MCP stdio transport — the server speaks the Model Context Protocol over stdin/stdout.
-- **FR-9**: Vault path is configurable — passed via environment variable `VAULT_PATH`, defaulting to `/mnt/c/Users/timhi/Documents/obsidian/brain-workbench`.
+- **FR-9**: Vault path is configurable — passed via environment variable `VAULT_PATH`.
 
 ### Non-Functional Requirements
 
@@ -188,7 +188,7 @@ The end user is an AI agent calling MCP tools. Example interactions:
 - `mcp` — Python MCP SDK for stdio transport and tool registration
 
 ### Related Systems
-- Obsidian vault at `/mnt/c/Users/timhi/Documents/obsidian/brain-workbench`
+- Obsidian vault (configurable via `VAULT_PATH`)
 - Hermes Agent, OpenCode, Claude Code — all clients via MCP
 - `wiki/AGENTS.md` — defines the vault schema this server must match
 - `wiki/index.md` and `wiki/log.md` — special files the server updates

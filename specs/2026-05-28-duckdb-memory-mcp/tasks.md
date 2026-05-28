@@ -218,7 +218,7 @@ Build a minimal MCP stdio server with 3 tools: `vault_info`, `vault_search`, `va
 - [x] **SP3-A1: Implement MCP server**
   - In `src/duckbrain/server.py`:
     - Create `mcp.Server` instance named "duckbrain"
-    - Read `VAULT_PATH` from env (default: `/mnt/c/Users/timhi/Documents/obsidian/brain-workbench`)
+    - Read `VAULT_PATH` from env
     - Lazy-load the FTS index: module-level `_conn: duckdb.DuckDBPyConnection | None = None` plus `_ensure_index()` that calls `scan_vault` → `build_fts_index` on first use
     - Register 3 tools with their schemas using `@server.tool()` decorator or equivalent `mcp` SDK API:
       - `vault_info` — no params
