@@ -1,4 +1,4 @@
-# duckbrain
+# DuckBrain
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/logo_writing_white_bg.png" alt="DuckBrain" width="500" />
@@ -10,7 +10,7 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents stru
 
 Existing agent memory tools (MemSearch, Open Brain, Mem0, Supermemory) treat memory as unstructured text blobs. If you maintain a [Karpathy-style LLM wiki](https://x.com/karpathy/status/1889054630119760374) in Obsidian with typed pages (entities, concepts, sources, synthesis), YAML frontmatter, tags, and wikilinks — none of those tools understand your vault's structure.
 
-duckbrain fills that gap. It reads your vault as-is and writes new pages following your vault's schema, so your wiki stays a single source of truth on the filesystem.
+DuckBrain fills that gap. It reads your vault as-is and writes new pages following your vault's schema, so your wiki stays a single source of truth on the filesystem.
 
 ## How it works
 
@@ -20,7 +20,7 @@ AI Agent (Claude Code / OpenCode / Hermes)
         │ MCP stdio
         ▼
 ┌──────────────────────┐
-│   duckbrain server   │
+│   DuckBrain server   │
 │                      │
 │  vault_info   ──►    │──► DuckDB FTS (in-memory)
 │  vault_search ──►    │
@@ -50,7 +50,7 @@ AI Agent (Claude Code / OpenCode / Hermes)
   - `wiki/log.md` — append-only chronological record
 - Pages should use YAML frontmatter: `title`, `item-type`, `tags`, `created`, `updated`
 
-This follows the schema defined for [LLM wikis](https://x.com/karpathy/status/1889054630119760374). If your vault uses a different structure, duckbrain works with it — but index/log updates expect the section headers above.
+This follows the schema defined for [LLM wikis](https://x.com/karpathy/status/1889054630119760374). If your vault uses a different structure, DuckBrain works with it — but index/log updates expect the section headers above.
 
 ## Quick Start
 
@@ -58,7 +58,7 @@ This follows the schema defined for [LLM wikis](https://x.com/karpathy/status/18
 pip install duckbrain
 ```
 
-That's it. Now connect your AI agent (see below) — you don't run duckbrain yourself, the agent spawns it as needed.
+That's it. Now connect your AI agent (see below) — you don't run DuckBrain yourself, the agent spawns it as needed.
 
 *(Optional: verify the install by running `duckbrain` — it'll fail with "VAULT_PATH not set", which confirms it's working.)*
 
@@ -76,7 +76,7 @@ This requires [uv](https://docs.astral.sh/uv/) (the Python package manager used 
 
 ## Connecting to Agents
 
-MCP stdio transport means the agent spawns duckbrain as a child process when it starts. You don't need a separate terminal or a running server. Just add this to your MCP config:
+MCP stdio transport means the agent spawns DuckBrain as a child process when it starts. You don't need a separate terminal or a running server. Just add this to your MCP config:
 
 ```json
 {
@@ -171,14 +171,14 @@ Do this proactively — don't wait to be asked. A learning saved is a bug not re
 ```markdown
 ## Session Learnings
 
-After debugging or completing work, save learnings via duckbrain:
+After debugging or completing work, save learnings via DuckBrain:
 - vault_write(kind="daily", title="<summary>", content="<details>", tags=[])
 - Use kind="concept" for reusable knowledge.
 ```
 
 #### Approach 2: Hooks (automatic, no prompt engineering needed)
 
-Hooks run shell commands at specific lifecycle points — no instructions needed, they fire deterministically. **⚠️ Not tested with duckbrain yet.**
+Hooks run shell commands at specific lifecycle points — no instructions needed, they fire deterministically. **⚠️ Not tested with DuckBrain yet.**
 
 **Claude Code** — supports a full [hooks system](https://code.claude.com/docs/en/hooks) including `SessionEnd` (fires when a session terminates). Add to `.claude/settings.json`:
 
@@ -370,13 +370,13 @@ This project stands on the shoulders of several ideas and tools:
 
 - **[Andrej Karpathy's LLM wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** — the idea that a personal markdown wiki, co-maintained by humans and AI agents, compounds into a persistent knowledge base. The vault schema (entities, concepts, sources, synthesis, daily log) is directly inspired by this.
 - **[DuckDB](https://duckdb.org/)** — the embedded analytical database that makes full-text search over flat files viable without a server, index sync, or persistent storage. The decision to use in-memory FTS instead of a vector database was a deliberate trade-off for simplicity.
-- **[Obsidian](https://obsidian.md/)** — the local-first, markdown-native note-taking tool that treats your files as the truth. duckbrain exists because Obsidian vaults deserve tooling that respects the filesystem.
-- **[MemSearch](https://github.com/zilliztech/memsearch)** and **[Open Brain (OB1)](https://github.com/NateBJones-Projects/OB1)** — early experiments in cross-tool agent memory that demonstrated the *need* for structured vault write-back while choosing different architectures. Their strengths and gaps directly informed duckbrain's design.
-- **[Agent Memory Systems (6-level taxonomy)](https://www.youtube.com/watch?v=UHVFcUzAGlM)** — Simon Scrapes' comprehensive comparison of Claude Code memory approaches provided the framework for understanding where duckbrain fits in the ecosystem (Level 6: cross-tool MCP with dedicated server).
+- **[Obsidian](https://obsidian.md/)** — the local-first, markdown-native note-taking tool that treats your files as the truth. DuckBrain exists because Obsidian vaults deserve tooling that respects the filesystem.
+- **[MemSearch](https://github.com/zilliztech/memsearch)** and **[Open Brain (OB1)](https://github.com/NateBJones-Projects/OB1)** — early experiments in cross-tool agent memory that demonstrated the *need* for structured vault write-back while choosing different architectures. Their strengths and gaps directly informed DuckBrain's design.
+- **[Agent Memory Systems (6-level taxonomy)](https://www.youtube.com/watch?v=UHVFcUzAGlM)** — Simon Scrapes' comprehensive comparison of Claude Code memory approaches provided the framework for understanding where DuckBrain fits in the ecosystem (Level 6: cross-tool MCP with dedicated server).
 - **[trellis-datamodel](https://github.com/timhiebenthal/trellis-datamodel)** — the same author's data modeling tool whose CI/CD patterns were borrowed for this project's repository readiness.
-- **[mondayDB 3 — Solving HTAP for a Trillion-Table System](https://engineering.monday.com/mondaydb-3-solving-htap-for-a-trillion-table-system/)** — monday.com's engineering blog on their DuckDB-powered CQRS read serving layer at production scale. Proved that DuckDB in-process with per-tenant file isolation is a viable architecture — the same pattern duckbrain applies at personal-wiki scale.
+- **[mondayDB 3 — Solving HTAP for a Trillion-Table System](https://engineering.monday.com/mondaydb-3-solving-htap-for-a-trillion-table-system/)** — monday.com's engineering blog on their DuckDB-powered CQRS read serving layer at production scale. Proved that DuckDB in-process with per-tenant file isolation is a viable architecture — the same pattern DuckBrain applies at personal-wiki scale.
 
-The core decision — **build, don't integrate** — came from a [structured comparison](https://github.com/timhiebenthal/duckbrain/blob/main/specs/2026-05-28-duckdb-memory-mcp/spec.md) of 7 existing tools. All failed on one requirement: vault schema-aware write-back. Rather than fork or extend, duckbrain started from first principles: what's the simplest thing that gives agents structured read/write access to an Obsidian vault? The answer was DuckDB + MCP + ~500 lines of Python.
+The core decision — **build, don't integrate** — came from a [structured comparison](https://github.com/timhiebenthal/duckbrain/blob/main/specs/2026-05-28-duckdb-memory-mcp/spec.md) of 7 existing tools. All failed on one requirement: vault schema-aware write-back. Rather than fork or extend, DuckBrain started from first principles: what's the simplest thing that gives agents structured read/write access to an Obsidian vault? The answer was DuckDB + MCP + ~500 lines of Python.
 
 ## License
 

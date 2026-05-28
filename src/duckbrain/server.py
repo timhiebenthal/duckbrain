@@ -1,4 +1,4 @@
-"""duckbrain MCP server — stdio transport."""
+"""DuckBrain MCP server — stdio transport."""
 
 import os
 import sys

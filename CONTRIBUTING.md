@@ -1,4 +1,4 @@
-# Contributing to duckbrain
+# Contributing to DuckBrain
 
 ## Development setup
 

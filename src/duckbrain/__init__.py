@@ -1,4 +1,4 @@
-"""duckbrain — DuckDB-backed MCP memory server for Obsidian vaults."""
+"""DuckBrain — DuckDB-backed MCP memory server for Obsidian vaults."""
 
 from dataclasses import dataclass, field
 

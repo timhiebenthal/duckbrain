@@ -1,4 +1,4 @@
-# AGENTS.md — duckbrain coding conventions
+# AGENTS.md — DuckBrain coding conventions
 
 ## Core mandate
 

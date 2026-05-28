@@ -1,4 +1,4 @@
-"""DuckDB FTS index build, search, and stats for duckbrain."""
+"""DuckDB FTS index build, search, and stats for DuckBrain."""
 
 from typing import Any
 

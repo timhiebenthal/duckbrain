@@ -1,4 +1,4 @@
-"""End-to-end tests for the duckbrain MCP server.
+"""End-to-end tests for the DuckBrain MCP server.
 
 Launches the server as a subprocess and tests all 3 tools against a temp vault
 using the MCP JSON-RPC protocol over stdio.
@@ -69,7 +69,7 @@ def _call_tool(server_proc: subprocess.Popen, name: str, arguments: dict | None 
 
 
 def _start_server(vault_path: Path) -> subprocess.Popen:
-    """Start the duckbrain MCP server as a subprocess."""
+    """Start the DuckBrain MCP server as a subprocess."""
     env = os.environ.copy()
     env["VAULT_PATH"] = str(vault_path)
 

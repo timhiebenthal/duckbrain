@@ -1,4 +1,4 @@
-"""Test fixtures for duckbrain."""
+"""Test fixtures for DuckBrain."""
 
 from pathlib import Path
 
@@ -23,7 +23,7 @@ def temp_vault(tmp_path: Path) -> Path:
     # Create daily/ subdirectory with a sample daily note
     daily_dir = vault / "daily"
     daily_dir.mkdir(parents=True)
-    daily_content = "# 2026-05-28\n\nWorked on duckbrain MCP server.\n"
+    daily_content = "# 2026-05-28\n\nWorked on DuckBrain MCP server.\n"
     (daily_dir / "2026-05-28.md").write_text(daily_content)
 
     # Create index.md with all four section headers
@@ -194,7 +194,7 @@ def sample_pages() -> list[PageMetadata]:
             title="2026-05-28",
             kind="daily",
             tags=[],
-            body="Worked on duckbrain MCP server.",
+            body="Worked on DuckBrain MCP server.",
             created="2026-05-28",
             updated="2026-05-28",
         ),

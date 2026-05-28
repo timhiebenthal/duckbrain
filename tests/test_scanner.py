@@ -138,6 +138,6 @@ def test_scan_vault_includes_daily(temp_vault: Path) -> None:
     assert daily.title == "2026-05-28"
     assert daily.filepath == "daily/2026-05-28.md"
     assert daily.tags == []
-    assert "Worked on duckbrain MCP server." in daily.body
+    assert "Worked on DuckBrain MCP server." in daily.body
     assert daily.created == "2026-05-28"
     assert daily.updated == "2026-05-28"
