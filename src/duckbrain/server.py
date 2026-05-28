@@ -38,9 +38,9 @@ def main() -> None:
         return handle_vault_info(vault_path)
 
     @server.tool()
-    def vault_read(title: str) -> dict:
-        """Read a wiki or daily page by title. Returns full markdown content with metadata."""
-        return handle_vault_read(vault_path, title)
+    def vault_read(title: str | None = None, filepath: str | None = None) -> dict:
+        """Read a wiki or daily page. Pass either title or filepath (from vault_search results)."""
+        return handle_vault_read(vault_path, title=title, filepath=filepath)
 
     @server.tool()
     def vault_search(
