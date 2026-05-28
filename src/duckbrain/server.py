@@ -53,11 +53,11 @@ def main() -> None:
 
     @server.tool()
     def vault_write(kind: str, title: str, content: str, tags: list[str]) -> dict:
-        """Create a new wiki page. Updates index.md and log.md automatically.
+        """Create a new wiki page or append to today's daily note.
 
         Args:
-            kind: entity | concept | source | synthesis
-            title: Page title
+            kind: entity | concept | source | synthesis | daily
+            title: Page title (or daily section heading)
             content: Markdown body (without frontmatter)
             tags: List of tag strings
         """

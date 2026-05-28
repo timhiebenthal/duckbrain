@@ -79,6 +79,65 @@ def slugify(title: str) -> str:
     return slug
 
 
+def _write_daily(
+    vault_path: str,
+    title: str,
+    content: str,
+    tags: list[str],
+) -> dict[str, Any]:
+    """Append a section to today's daily note.
+
+    Daily notes live under ``daily/YYYY-MM-DD.md`` in the vault root
+    (not under ``wiki/``).  They have no YAML frontmatter and are
+    **appended** to — the file grows throughout the day.
+
+    Args:
+        vault_path: Root path of the Obsidian vault.
+        title: Section heading for this daily entry.
+        content: Markdown body content.
+        tags: List of tag strings.
+
+    Returns:
+        A dict with keys ``success`` (bool), ``filepath`` (str, relative),
+        and ``warnings`` (list of str).
+    """
+    warnings: list[str] = []
+    today = date.today().isoformat()
+    relative_path = f"daily/{today}.md"
+    filepath = Path(vault_path) / relative_path
+
+    # Build the entry body
+    entry = f"\n## {title}\n\n{content}\n"
+    if tags:
+        entry += f"\n**Tags:** {', '.join(tags)}\n"
+
+    # Create daily directory if needed
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    # If file doesn't exist yet, prepend a top-level date heading
+    if not filepath.exists():
+        entry = f"# {today}\n{entry}"
+
+    # Append to file (always — daily notes accumulate)
+    with filepath.open("a") as f:
+        f.write(entry)
+
+    # Update log.md (but NOT index.md — daily pages aren't in the wiki index)
+    log_path = Path(vault_path) / "wiki" / "log.md"
+    try:
+        log_entry = f"## [{today}] daily | {title}\n- Added to daily note: {title}\n"
+        with log_path.open("a") as f:
+            f.write(log_entry)
+    except OSError as e:
+        warnings.append(f"Failed to update log.md: {e}")
+
+    return {
+        "success": True,
+        "filepath": relative_path,
+        "warnings": warnings,
+    }
+
+
 def write_page(
     vault_path: str,
     kind: str,
@@ -107,6 +166,9 @@ def write_page(
         A dict with keys ``success`` (bool), ``filepath`` (str, relative),
         and ``warnings`` (list of str).
     """
+    if kind == "daily":
+        return _write_daily(vault_path, title, content, tags)
+
     warnings: list[str] = []
     today = date.today().isoformat()
 

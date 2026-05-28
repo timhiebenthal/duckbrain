@@ -1,5 +1,6 @@
 """Tests for duckbrain.writer — page creation and vault management."""
 
+from datetime import date
 from pathlib import Path
 
 
@@ -349,3 +350,90 @@ def test_write_page_existing_index_preserved(temp_vault: Path) -> None:
     assert entities_idx < a_idx < concepts_idx, "A should be under Entities"
     assert concepts_idx < b_idx < sources_idx, "B should be under Concepts"
     assert synthesis_idx < c_idx, "C should be under Synthesis"
+
+
+# ── Daily write tests ─────────────────────────────────────────────────────────
+
+
+def test_write_daily_creates_file(temp_vault: Path) -> None:
+    """Writing a daily entry creates daily/YYYY-MM-DD.md."""
+    from duckbrain.writer import write_page
+
+    result = write_page(
+        str(temp_vault), "daily", "Debugging session",
+        "Found a bug in the FTS index.",
+        ["debugging", "fts"],
+    )
+    assert result["success"] is True
+    today = date.today().isoformat()
+    expected_path = f"daily/{today}.md"
+    assert result["filepath"] == expected_path
+    filepath = temp_vault / expected_path
+    assert filepath.exists()
+    content = filepath.read_text()
+    assert "# Debugging session" in content
+    assert "Found a bug in the FTS index." in content
+
+
+def test_write_daily_has_no_frontmatter(temp_vault: Path) -> None:
+    """Daily entries have NO yaml frontmatter."""
+    from duckbrain.writer import write_page
+
+    result = write_page(
+        str(temp_vault), "daily", "Test entry",
+        "Some content.",
+        ["test"],
+    )
+    filepath = temp_vault / result["filepath"]
+    content = filepath.read_text()
+    assert "---" not in content
+    assert "item-type" not in content
+
+
+def test_write_daily_appends(temp_vault: Path) -> None:
+    """Second write to same day appends, does not overwrite."""
+    from duckbrain.writer import write_page
+
+    today = date.today().isoformat()
+    # First write
+    write_page(str(temp_vault), "daily", "First entry", "Content one.", ["a"])
+    # Second write
+    write_page(str(temp_vault), "daily", "Second entry", "Content two.", ["b"])
+    # Read file
+    filepath = temp_vault / f"daily/{today}.md"
+    content = filepath.read_text()
+    assert "First entry" in content
+    assert "Content one." in content
+    assert "Second entry" in content
+    assert "Content two." in content
+    # First entry should appear before second
+    assert content.index("First entry") < content.index("Second entry")
+
+
+def test_write_daily_updates_log(temp_vault: Path) -> None:
+    """Daily writes still update the log."""
+    from duckbrain.writer import write_page
+
+    result = write_page(
+        str(temp_vault), "daily", "Daily log test",
+        "Testing log update.",
+        ["test"],
+    )
+    log_path = temp_vault / "wiki" / "log.md"
+    log_content = log_path.read_text()
+    assert "Daily log test" in log_content
+
+
+def test_write_daily_no_index_update(temp_vault: Path) -> None:
+    """Daily writes do NOT update wiki/index.md."""
+    from duckbrain.writer import write_page
+
+    index_path = temp_vault / "wiki" / "index.md"
+    before = index_path.read_text()
+    write_page(
+        str(temp_vault), "daily", "Index test",
+        "Should not appear in index.",
+        ["test"],
+    )
+    after = index_path.read_text()
+    assert before == after  # No change

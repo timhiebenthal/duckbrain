@@ -85,6 +85,7 @@ Where to put it:
 |-------|-------------|---------------|
 | Claude Code | `~/.claude/claude_desktop_config.json` or `.mcp.json` | `mcpServers` |
 | OpenCode | `opencode.json` | `mcp` |
+| Cursor | `.cursor/mcp.json` | `mcpServers` |
 | Hermes Agent | `mcp.json` | `mcpServers` |
 
 Example for Claude Code:
@@ -103,6 +104,78 @@ Example for Claude Code:
 ```
 
 Make sure `uv` is on your `PATH` and the working directory is the `duckbrain` project root. The `env` field in the config is all you need — no system-wide `VAULT_PATH` required.
+
+### Auto-Writing Session Learnings
+
+After connecting duckbrain, tell your agent to write learnings to your vault automatically. Add this to the appropriate instructions file:
+
+**Claude Code** — add to `CLAUDE.md`:
+
+```markdown
+## Session Learnings
+
+After debugging, diving into rabbit holes, or completing significant work,
+save what you learned so you don't repeat mistakes:
+
+- Use vault_write(kind="daily", title="...", content="...", tags=["..."])
+  to append to today's daily note.
+- For reusable knowledge, use vault_write(kind="concept", title="...",
+  content="...", tags=["..."]) to create a wiki page.
+```
+
+**OpenCode** — add to your config's `instructions` field (`opencode.json`):
+
+```json
+"instructions": ["/path/to/duckbrain/LEARNINGS.md"]
+```
+
+Then create `LEARNINGS.md` with:
+
+```markdown
+## Session Learnings
+
+When you encounter problems, debug issues, or discover non-obvious solutions,
+save the learning to the vault so it's available in future sessions:
+
+- Append to today's daily note:
+  vault_write(kind="daily", title="short summary", content="what you learned", tags=["debugging", "learned"])
+
+- For reusable concepts/patterns worth revisiting:
+  vault_write(kind="concept", title="Concept Name", content="explanation", tags=["relevant", "tags"])
+
+Do this proactively — don't wait to be asked. A learning saved is a bug not repeated.
+```
+
+**Cursor** — add to `.cursorrules`:
+
+```markdown
+## Session Learnings
+
+After debugging or completing work, save learnings via duckbrain:
+- vault_write(kind="daily", title="<summary>", content="<details>", tags=[])
+- Use kind="concept" for reusable knowledge.
+```
+
+### How It Works
+
+During a session, the agent encounters a problem, debugs it, and resolves it:
+
+```
+> vault_search("duckbrain daily write")
+> vault_read(filepath="wiki/...")
+
+Agent debugs, fixes, learns something...
+
+> vault_write(
+    kind="daily",
+    title="vault_write daily kind doesn't support filepath-based reads",
+    content="When vault_search returns filepaths, the agent may try to Read files
+    directly. vault_read should accept filepath as well as title to close this gap.",
+    tags=["duckbrain", "debugging", "learned"]
+  )
+```
+
+The learning is now in `daily/2026-05-28.md`. Tomorrow when you ask "how do I read vault pages by path?", the agent searches the vault, finds your note, and recalls the solution.
 
 ## Tools
 
@@ -140,12 +213,33 @@ Full-text search over all wiki pages.
 
 Parameters:
 - `query` (required) — search text, BM25-ranked
-- `kind` (optional) — filter to `entity`, `concept`, `source`, or `synthesis`
+- `kind` (optional) — filter to `entity`, `concept`, `source`, `synthesis`, or `daily`
 - `tags` (optional) — filter by tag substring matches
+
+### `vault_read`
+
+Read a page by title or filepath. Returns full markdown content with metadata.
+
+```
+> vault_read(title="Agent Memory Systems")
+→ {
+    title: "Agent Memory Systems", kind: "concept",
+    filepath: "wiki/concepts/agent-memory-systems.md",
+    content: "# Agent Memory Systems\n\nA 6-level taxonomy...",
+    tags: ["agent-memory", "taxonomy", "ai"],
+    created: "2026-05-28", updated: "2026-05-28"
+  }
+```
+
+Parameters:
+- `title` (optional) — page title to look up (case-insensitive)
+- `filepath` (optional) — relative path from vault_search results (e.g. `wiki/concepts/foo.md`)
+
+Use after `vault_search` to get full page content. Pass `filepath` from search results directly.
 
 ### `vault_write`
 
-Create a new wiki page with correct frontmatter, auto-updating the index and log.
+Create a new wiki page or append to today's daily note, with automatic index and log updates.
 
 ```
 > vault_write(
@@ -157,14 +251,32 @@ Create a new wiki page with correct frontmatter, auto-updating the index and log
 → { success: true, filepath: "wiki/concepts/duckdb-fts-memory.md" }
 ```
 
-This automatically:
+For daily notes (session learnings, debugging logs):
+```
+> vault_write(
+    kind="daily",
+    title="Debugging vault_read filepath",
+    content="When search returns filepaths, agents try to Read files directly.",
+    tags=["duckbrain", "debugging"]
+  )
+→ { success: true, filepath: "daily/2026-05-28.md" }
+```
+
+For wiki pages (entity|concept|source|synthesis), this automatically:
 1. Writes the markdown file to the correct wiki subdirectory
-2. Appends an entry to `wiki/index.md` in the right section
-3. Appends a dated entry to `wiki/log.md`
+2. Generates YAML frontmatter with title, item-type, tags, dates
+3. Appends an entry to `wiki/index.md` in the right section
+4. Appends a dated entry to `wiki/log.md`
+
+For daily notes, this automatically:
+1. Appends to `daily/YYYY-MM-DD.md` (creates the file if today's doesn't exist yet)
+2. No YAML frontmatter — just a `## heading` + content
+3. Does NOT update index.md (daily notes aren't wiki pages)
+4. Appends a dated entry to `wiki/log.md`
 
 Parameters:
-- `kind` (required) — `entity`, `concept`, `source`, or `synthesis`
-- `title` (required) — page title
+- `kind` (required) — `entity`, `concept`, `source`, `synthesis`, or `daily`
+- `title` (required) — page title (or section heading for daily entries)
 - `content` (required) — markdown body (without frontmatter)
 - `tags` (required) — list of tag strings
 
