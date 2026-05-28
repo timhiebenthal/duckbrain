@@ -66,10 +66,29 @@ The server listens on stdio — it's ready for any MCP-compatible agent to conne
 
 ## Connecting to Agents
 
-### Claude Code
+Add this to your MCP config (replace the vault path):
 
-Add to your Claude Code MCP config (`~/.claude/claude_desktop_config.json` or project `.mcp.json`):
+```json
+{
+  "duckbrain": {
+    "command": "uv",
+    "args": ["run", "duckbrain"],
+    "env": {
+      "VAULT_PATH": "/path/to/your/obsidian/vault"
+    }
+  }
+}
+```
 
+Where to put it:
+
+| Agent | Config file | Top-level key |
+|-------|-------------|---------------|
+| Claude Code | `~/.claude/claude_desktop_config.json` or `.mcp.json` | `mcpServers` |
+| OpenCode | `opencode.json` | `mcp` |
+| Hermes Agent | `mcp.json` | `mcpServers` |
+
+Example for Claude Code:
 ```json
 {
   "mcpServers": {
@@ -84,41 +103,7 @@ Add to your Claude Code MCP config (`~/.claude/claude_desktop_config.json` or pr
 }
 ```
 
-### OpenCode
-
-Add to `opencode.json`:
-
-```json
-{
-  "mcp": {
-    "duckbrain": {
-      "command": "uv",
-      "args": ["run", "duckbrain"],
-      "env": {
-        "VAULT_PATH": "/path/to/your/obsidian/vault"
-      }
-    }
-  }
-}
-```
-
-### Hermes Agent
-
-Add to your Hermes `mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "duckbrain": {
-      "command": "uv",
-      "args": ["run", "duckbrain"],
-      "env": {
-        "VAULT_PATH": "/path/to/your/obsidian/vault"
-      }
-    }
-  }
-}
-```
+Make sure `uv` is on your `PATH` and the working directory is the `duckbrain` project root.
 
 ## Tools
 
