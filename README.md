@@ -55,14 +55,13 @@ git clone https://github.com/your-org/duckbrain.git
 cd duckbrain
 uv sync
 
-# 2. Set your vault path
-export VAULT_PATH="/path/to/your/obsidian/vault"
-
-# 3. Start the server
-uv run duckbrain
+# 2. Start the server
+VAULT_PATH="/path/to/your/obsidian/vault" uv run duckbrain
 ```
 
 The server listens on stdio — it's ready for any MCP-compatible agent to connect.
+
+> **Note:** `VAULT_PATH` only needs to be set as a system env var for standalone testing like this. When using MCP (next section), the config file's `env` field handles it.
 
 ## Connecting to Agents
 
@@ -103,7 +102,7 @@ Example for Claude Code:
 }
 ```
 
-Make sure `uv` is on your `PATH` and the working directory is the `duckbrain` project root.
+Make sure `uv` is on your `PATH` and the working directory is the `duckbrain` project root. The `env` field in the config is all you need — no system-wide `VAULT_PATH` required.
 
 ## Tools
 
@@ -171,7 +170,7 @@ Parameters:
 
 ## Vault Path
 
-Set via the `VAULT_PATH` environment variable. Falls back to:
+Set via the `VAULT_PATH` environment variable (or the `env` field in your MCP config — no need for both). Falls back to:
 
 ```
 /mnt/c/Users/timhi/Documents/obsidian/brain-workbench
