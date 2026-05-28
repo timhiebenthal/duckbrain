@@ -14,6 +14,7 @@ def test_vault_info_returns_counts(temp_vault: Path) -> None:
     assert info["concepts"] == 2
     assert info["sources"] == 1
     assert info["synthesis"] == 1
+    assert info["daily"] == 1
 
 
 def test_vault_info_includes_tags(temp_vault: Path) -> None:

@@ -78,7 +78,8 @@ def search(
     Returns
     -------
     list[dict]
-        Each dict has keys ``title``, ``kind``, ``filepath``, ``snippet``.
+        Each dict has keys ``title``, ``kind``, ``filepath``, ``snippet``,
+        ``created``, ``updated``.
     """
     # Build the query dynamically.
     # The FTS match uses the fts_main_pages.match_bm25 function.
@@ -102,7 +103,7 @@ def search(
         where_clause = " AND " + " AND ".join(conditions)
 
     sql = f"""
-        SELECT p.title, p.kind, p.filepath, p.body
+        SELECT p.title, p.kind, p.filepath, p.body, p.created, p.updated
         FROM (
             SELECT *, fts_main_pages.match_bm25(p.filepath, $query) AS score
             FROM pages p
@@ -115,7 +116,7 @@ def search(
 
     results: list[dict[str, Any]] = []
     for row in rows:
-        title, kind_val, filepath, body = row
+        title, kind_val, filepath, body, created, updated = row
         # Build a simple snippet: first 100 chars of body
         snippet = body[:100] + "..." if len(body) > 100 else body
         results.append(
@@ -124,6 +125,8 @@ def search(
                 "kind": kind_val,
                 "filepath": filepath,
                 "snippet": snippet,
+                "created": created,
+                "updated": updated,
             }
         )
 
@@ -139,7 +142,7 @@ def get_stats(
     -------
     dict
         Keys: ``entities``, ``concepts``, ``sources``, ``synthesis``,
-        ``available_tags``, ``last_modified``.
+        ``daily``, ``available_tags``, ``last_modified``.
     """
     # Count by kind
     kind_counts: dict[str, int] = {
@@ -147,6 +150,7 @@ def get_stats(
         "concept": 0,
         "source": 0,
         "synthesis": 0,
+        "daily": 0,
     }
     rows = conn.execute(
         "SELECT kind, COUNT(*) FROM pages GROUP BY kind"
@@ -175,6 +179,7 @@ def get_stats(
         "concepts": kind_counts["concept"],
         "sources": kind_counts["source"],
         "synthesis": kind_counts["synthesis"],
+        "daily": kind_counts["daily"],
         "available_tags": sorted(all_tags),
         "last_modified": last_modified,
     }

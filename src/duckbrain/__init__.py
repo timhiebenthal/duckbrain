@@ -22,6 +22,8 @@ class SearchResult:
     kind: str
     filepath: str
     snippet: str
+    created: str = ""
+    updated: str = ""
     matched_tags: list[str] = field(default_factory=list)
 
 

@@ -14,14 +14,15 @@ def test_scan_vault_finds_all_pages(temp_vault: Path) -> None:
 
     pages = scan_vault(str(temp_vault))
 
-    # temp_vault fixture creates 5 pages with item-type
-    assert len(pages) == 5
+    # temp_vault fixture creates 5 wiki pages + 1 daily note
+    assert len(pages) == 6
 
     kinds = [p.kind for p in pages]
     assert kinds.count("entity") == 1
     assert kinds.count("concept") == 2
     assert kinds.count("source") == 1
     assert kinds.count("synthesis") == 1
+    assert kinds.count("daily") == 1
 
     # Check a specific page's kind is inferred from parent dir
     for p in pages:
@@ -45,7 +46,7 @@ def test_scan_vault_excludes_non_wiki(temp_vault: Path) -> None:
     pages = scan_vault(str(temp_vault))
     titles = [p.title for p in pages]
     assert "junk.md" not in [p.filepath for p in pages]
-    assert len(pages) == 5  # unchanged
+    assert len(pages) == 6  # 5 wiki + 1 daily
 
 
 def test_scan_vault_frontmatter_no_item_type(temp_vault: Path) -> None:
@@ -58,7 +59,7 @@ def test_scan_vault_frontmatter_no_item_type(temp_vault: Path) -> None:
     pages = scan_vault(str(temp_vault))
     titles = [p.title for p in pages]
     assert "No Type" not in titles
-    assert len(pages) == 5
+    assert len(pages) == 6  # 5 wiki + 1 daily
 
 
 def test_scan_vault_empty_dir(tmp_path: Path) -> None:
@@ -122,5 +123,25 @@ def test_scan_vault_non_utf8(temp_vault: Path) -> None:
     # Should not include the binary file
     paths = [p.filepath for p in pages]
     assert "wiki/synthesis/binary.md" not in paths
-    # Should still find the original 5 pages
-    assert len(pages) == 5
+    # Should still find the original 5 pages + daily
+    assert len(pages) == 6
+
+
+def test_scan_vault_includes_daily(temp_vault: Path) -> None:
+    """scan_vault returns daily notes alongside wiki pages."""
+    from duckbrain.scanner import scan_vault
+
+    pages = scan_vault(str(temp_vault))
+
+    # Find daily pages
+    daily_pages = [p for p in pages if p.kind == "daily"]
+    assert len(daily_pages) >= 1
+
+    # Check the daily page from the fixture
+    daily = daily_pages[0]
+    assert daily.title == "2026-05-28"
+    assert daily.filepath == "daily/2026-05-28.md"
+    assert daily.tags == []
+    assert "Worked on duckbrain MCP server." in daily.body
+    assert daily.created == "2026-05-28"
+    assert daily.updated == "2026-05-28"

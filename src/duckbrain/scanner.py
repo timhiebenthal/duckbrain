@@ -98,17 +98,42 @@ def scan_vault(vault_path: str) -> list[PageMetadata]:
                 )
             )
 
+    pages.extend(scan_daily(vault_path))
     return pages
 
 
 def scan_daily(vault_path: str) -> list[PageMetadata]:
-    """Scan daily notes (placeholder for future use).
+    """Scan daily notes (``daily/*.md``).
 
-    Glob ``daily/*.md`` under *vault_path* and returns metadata for each file.
-    Currently returns an empty list.
+    Daily files have no YAML frontmatter — all metadata is derived from the
+    filename (title = filename stem, created/updated = filename date).
+
+    Args:
+        vault_path: Root path of the Obsidian vault.
+
+    Returns:
+        A list of :class:`PageMetadata` objects (one per daily file).
     """
-    # TODO: implement daily note scanning when needed
-    # vault = Path(vault_path)
-    # for filepath in sorted(vault.glob("daily/*.md")):
-    #     ...
-    return []
+    daily_dir = Path(vault_path) / "daily"
+    if not daily_dir.is_dir():
+        return []
+
+    pages: list[PageMetadata] = []
+    for md_file in sorted(daily_dir.glob("*.md")):
+        date_str = md_file.stem
+        try:
+            body = md_file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        pages.append(
+            PageMetadata(
+                filepath=str(md_file.relative_to(Path(vault_path))),
+                title=date_str,
+                kind="daily",
+                tags=[],
+                body=body,
+                created=date_str,
+                updated=date_str,
+            )
+        )
+    return pages

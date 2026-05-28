@@ -114,14 +114,20 @@ def test_search_no_match(fts_conn) -> None:
 
 
 def test_search_result_structure(fts_conn) -> None:
-    """Each result is a dict with keys title, kind, filepath, snippet."""
+    """Each result is a dict with keys title, kind, filepath, snippet, created, updated."""
     from duckbrain.indexer import search
 
     results = search(fts_conn, "memory")
     assert len(results) >= 1
-    expected_keys = {"title", "kind", "filepath", "snippet"}
+    expected_keys = {"title", "kind", "filepath", "snippet", "created", "updated"}
     for r in results:
         assert set(r.keys()) == expected_keys, f"Got keys: {set(r.keys())}"
+        assert isinstance(r["created"], str) and r["created"] != "", (
+            f"created should be a non-empty string, got {r['created']!r}"
+        )
+        assert isinstance(r["updated"], str) and r["updated"] != "", (
+            f"updated should be a non-empty string, got {r['updated']!r}"
+        )
 
 
 # ── get_stats tests ───────────────────────────────────────────────────────────

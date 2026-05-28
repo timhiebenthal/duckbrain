@@ -18,7 +18,7 @@ def handle_vault_info(vault_path: str) -> dict[str, Any]:
 
     Returns:
         A dict with keys: ``entities``, ``concepts``, ``sources``,
-        ``synthesis``, ``available_tags``, ``last_modified``.
+        ``synthesis``, ``daily``, ``available_tags``, ``last_modified``.
     """
     pages = scan_vault(vault_path)
     conn = build_fts_index(pages)

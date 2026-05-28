@@ -18,6 +18,12 @@ def temp_vault(tmp_path: Path) -> Path:
     for subdir in ["entities", "concepts", "sources", "synthesis"]:
         (wiki / subdir).mkdir(parents=True)
 
+    # Create daily/ subdirectory with a sample daily note
+    daily_dir = vault / "daily"
+    daily_dir.mkdir(parents=True)
+    daily_content = "# 2026-05-28\n\nWorked on duckbrain MCP server.\n"
+    (daily_dir / "2026-05-28.md").write_text(daily_content)
+
     # Create index.md with all four section headers
     index_content = """# Wiki Index
 
@@ -169,5 +175,14 @@ def sample_pages() -> list[PageMetadata]:
             body="Benn Stancil on the metrics layer as the missing MDS component.",
             created="2026-05-20",
             updated="2026-05-20",
+        ),
+        PageMetadata(
+            filepath="daily/2026-05-28.md",
+            title="2026-05-28",
+            kind="daily",
+            tags=[],
+            body="Worked on duckbrain MCP server.",
+            created="2026-05-28",
+            updated="2026-05-28",
         ),
     ]
