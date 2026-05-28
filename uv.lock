@@ -164,6 +164,7 @@ source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "mcp", extra = ["cli"] },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
 
@@ -176,6 +177,7 @@ dev = [
 requires-dist = [
     { name = "duckdb", specifier = ">=1.5.3" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.27.1" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 

@@ -170,10 +170,12 @@ Parameters:
 
 ## Vault Path
 
-Set via the `VAULT_PATH` environment variable (or the `env` field in your MCP config — no need for both). Falls back to:
+Set via the `VAULT_PATH` environment variable (or the `env` field in your MCP config — no need for both). 
+
+For local development, copy `.env.example` to `.env` and set your path:
 
 ```
-/mnt/c/Users/timhi/Documents/obsidian/brain-workbench
+VAULT_PATH=/path/to/your/obsidian/vault
 ```
 
 If you use WSL2 with your vault on Windows, set it to the WSL mount path (e.g., `/mnt/c/Users/you/Documents/obsidian/my-vault`).

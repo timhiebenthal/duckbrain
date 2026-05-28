@@ -1,20 +1,29 @@
 """duckbrain MCP server — stdio transport."""
 
 import os
+import sys
 
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from duckbrain.tools.vault_info import handle_vault_info
 from duckbrain.tools.vault_search import handle_vault_search
 from duckbrain.tools.vault_write import handle_vault_write
 
+# Load .env from project root (or current working directory)
+load_dotenv()
+
 
 def get_vault_path() -> str:
-    """Return vault path from VAULT_PATH env var, with sensible default."""
-    return os.environ.get(
-        "VAULT_PATH",
-        "/mnt/c/Users/timhi/Documents/obsidian/brain-workbench",
-    )
+    """Return vault path from VAULT_PATH env var."""
+    vault_path = os.environ.get("VAULT_PATH")
+    if not vault_path:
+        print(
+            "VAULT_PATH not set. Set it in a .env file or environment variable.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return vault_path
 
 
 def main() -> None:
