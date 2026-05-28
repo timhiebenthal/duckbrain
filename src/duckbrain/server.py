@@ -11,8 +11,15 @@ from duckbrain.tools.vault_read import handle_vault_read
 from duckbrain.tools.vault_search import handle_vault_search
 from duckbrain.tools.vault_write import handle_vault_write
 
-# Load .env from project root (or current working directory)
+# Load .env from project root (or current working directory).
 load_dotenv()
+
+# Handle the case where MCP config sets VAULT_PATH to empty string
+# (e.g. OpenCode's {env:VAULT_PATH} when the var is not in shell),
+# which blocks load_dotenv from loading the .env value.
+if os.environ.get("VAULT_PATH", "").strip() == "":
+    os.environ.pop("VAULT_PATH", None)
+    load_dotenv()
 
 
 def get_vault_path() -> str:
@@ -20,7 +27,15 @@ def get_vault_path() -> str:
     vault_path = os.environ.get("VAULT_PATH")
     if not vault_path:
         print(
-            "VAULT_PATH not set. Set it in a .env file or environment variable.",
+            "VAULT_PATH is empty or not set.\n"
+            "\n"
+            "Fix: copy .env.example → .env and set VAULT_PATH to your vault.\n"
+            "    cp .env.example .env\n"
+            "    # edit .env with your vault path\n"
+            "\n"
+            "If using {env:VAULT_PATH} in MCP config, either:\n"
+            "  a) Set VAULT_PATH in your shell (~/.bashrc, ~/.zshrc etc.)\n"
+            "  b) Remove the 'environment' block from the MCP config so .env is used",
             file=sys.stderr,
         )
         sys.exit(1)
