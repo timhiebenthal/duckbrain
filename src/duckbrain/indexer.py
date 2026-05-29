@@ -101,7 +101,7 @@ def search(
         where_clause = " AND " + " AND ".join(conditions)
 
     sql = f"""
-        SELECT p.title, p.kind, p.filepath, p.body, p.created, p.updated
+        SELECT p.title, p.kind, p.filepath, p.body, p.created, p.updated, p.score
         FROM (
             SELECT *, fts_main_pages.match_bm25(p.filepath, $query) AS score
             FROM pages p
@@ -113,8 +113,9 @@ def search(
     rows = conn.execute(sql, params).fetchall()
 
     results: list[dict[str, Any]] = []
+    tag_list = tags if tags else []
     for row in rows:
-        title, kind_val, filepath, body, created, updated = row
+        title, kind_val, filepath, body, created, updated, score = row
         # Build a simple snippet: first 100 chars of body
         snippet = body[:100] + "..." if len(body) > 100 else body
         results.append(
@@ -123,8 +124,10 @@ def search(
                 "kind": kind_val,
                 "filepath": filepath,
                 "snippet": snippet,
+                "score": round(score, 2),
                 "created": created,
                 "updated": updated,
+                "matched_tags": tag_list,
             }
         )
 

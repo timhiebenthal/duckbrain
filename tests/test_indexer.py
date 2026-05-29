@@ -114,12 +114,16 @@ def test_search_no_match(fts_conn) -> None:
 
 
 def test_search_result_structure(fts_conn) -> None:
-    """Each result is a dict with keys title, kind, filepath, snippet, created, updated."""
+    """Each result is a dict with keys title, kind, filepath, snippet, score,
+    matched_tags, created, updated."""
     from duckbrain.indexer import search
 
     results = search(fts_conn, "memory")
     assert len(results) >= 1
-    expected_keys = {"title", "kind", "filepath", "snippet", "created", "updated"}
+    expected_keys = {
+        "title", "kind", "filepath", "snippet", "score",
+        "matched_tags", "created", "updated",
+    }
     for r in results:
         assert set(r.keys()) == expected_keys, f"Got keys: {set(r.keys())}"
         assert isinstance(r["created"], str) and r["created"] != "", (
@@ -127,6 +131,35 @@ def test_search_result_structure(fts_conn) -> None:
         )
         assert isinstance(r["updated"], str) and r["updated"] != "", (
             f"updated should be a non-empty string, got {r['updated']!r}"
+        )
+
+
+def test_search_result_includes_score(fts_conn) -> None:
+    """Each result dict includes a numeric 'score' key."""
+    from duckbrain.indexer import search
+
+    results = search(fts_conn, "memory")
+    assert len(results) >= 1
+    for r in results:
+        assert "score" in r, f"Missing 'score' in result keys: {set(r.keys())}"
+        assert isinstance(r["score"], (int, float)), (
+            f"score should be numeric, got {type(r['score'])}: {r['score']!r}"
+        )
+
+
+def test_search_result_includes_matched_tags(fts_conn) -> None:
+    """Each result dict includes a 'matched_tags' key (was in SearchResult
+    dataclass but never populated)."""
+    from duckbrain.indexer import search
+
+    results = search(fts_conn, "memory", tags=["agent-memory"])
+    assert len(results) >= 1
+    for r in results:
+        assert "matched_tags" in r, (
+            f"Missing 'matched_tags' in result keys: {set(r.keys())}"
+        )
+        assert isinstance(r["matched_tags"], list), (
+            f"matched_tags should be a list, got {type(r['matched_tags'])}"
         )
 
 
