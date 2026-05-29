@@ -92,7 +92,7 @@ export const DuckBrainSessionInit = async (ctx) => {
       "Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.",
       "",
       "### Journaling rule",
-      "After non-trivial responses: vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — What was done\\n\\n...\") at START of next response. Skip trivial.",
+      "After EVERY non-trivial response, BEFORE your next sentence: vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — What was done\\n\\n...\"). Skip trivial Q&A only.",
       "",
       vaultTagsBlock,
     ].join("\n");
