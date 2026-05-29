@@ -65,7 +65,7 @@ export const DuckBrainSessionInit = async (ctx) => {
         }
       }
       if (tagSet.size > 0) {
-        vaultTagsBlock = `\n### Vault topics (${tagSet.size} tags)\n${[...tagSet].sort().join(", ")}\n\nUse vault_context() or vault_search() for topics above. Skip vault for unrelated queries.`;
+        vaultTagsBlock = `\n### Vault topic coverage (searchable, not pre-loaded)\nThe vault wiki covers these topics: ${[...tagSet].sort().join(", ")}\n\nIf the user's question relates to any of these → vault_context() or vault_search().\nIf unrelated (e.g. cooking, cars, sports) → skip the vault entirely.`;
       }
     } catch {
       vaultTagsBlock = "\n### Vault topics\nTags scan unavailable. Call vault_info() to discover topics.";
@@ -81,34 +81,17 @@ export const DuckBrainSessionInit = async (ctx) => {
       yesterdayContent,
       "",
       "### Vault learnings ritual",
+      "Save learnings via vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — Summary\\n\\n...\"):",
+      "- After completing a task or fixing a bug",
+      "- After finding root cause of a bug",
+      "- After a discovery during investigation",
+      "- After >5 min stuck on a problem",
+      "- After an architecture decision",
+      "- At end of session (/journal)",
+      "Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.",
       "",
-      "#### Triggers (save when you finish something, not after every edit)",
-      "- AFTER completing a task or fixing a bug → vault_write summary to today's daily",
-      "- AFTER finding root cause of a bug → vault_write root cause + fix",
-      "- AFTER making a discovery during investigation → vault_write findings",
-      "- AFTER >5 min stuck on a problem → vault_write progress/journey so far",
-      "- AFTER an architecture decision → vault_write reasoning + trade-offs",
-      "",
-      "#### Session rituals",
-      "- At session start: call vault_context(keywords=[...]) with prompt-extracted keywords",
-      "- During session: after non-trivial task, vault_write progress to daily note (format: ## HH:MM — What was done)",
-      '- End of session (or on "/journal"): vault_write session summary to daily note',
-      "  Include: Progress, Learnings, Open questions",
-      "",
-      "#### How to save",
-      "- vault_search first to avoid duplicates",
-      "- Daily notes → session log, progress, debugging, one-off learnings",
-      "- Wiki concepts → reusable knowledge worth permanent reference",
-      "",
-      "#### Daily note structure",
-      "- Caveman-concise. Cut filler words, keep substance",
-      "- Expand only when detail matters: debugging root cause, architecture trade-offs",
-      "",
-      "### Journaling rule (FOLLOW THIS)",
-      "After EVERY response where you accomplished real work (not just answered a question),",
-      "call vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — What was done\\n\\n...\").",
-      "Do this at the START of your next response, before answering the user.",
-      "Skip for trivial: small questions, single-line answers, reading files.",
+      "### Journaling rule",
+      "After non-trivial responses: vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — What was done\\n\\n...\") at START of next response. Skip trivial.",
       "",
       vaultTagsBlock,
     ].join("\n");
