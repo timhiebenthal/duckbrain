@@ -20,7 +20,6 @@ import type { Plugin } from "@opencode-ai/plugin"
 
 const MAX_DAILY_NOTES   = 3    // how many recent daily notes to include in full
 const MAX_LOG_LINES     = 40   // tail of wiki/log.md to show
-const MAX_INDEX_CHARS   = 6000 // cap on wiki/index.md (trim if vault is huge)
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -61,16 +60,7 @@ async function loadVaultContext(vaultPath: string): Promise<string> {
     parts.push(`## Vault topic tags\n${tags.trim()}`)
   }
 
-  // 1. Vault index (the page catalog — entities, concepts, sources, synthesis)
-  const index = await safeRead(`${vaultPath}/wiki/index.md`)
-  if (index) {
-    const trimmed = index.length > MAX_INDEX_CHARS
-      ? index.slice(0, MAX_INDEX_CHARS) + "\n… [truncated]"
-      : index
-    parts.push(`## Vault index\n${trimmed}`)
-  }
-
-  // 2. Tail of wiki/log.md — most recent write activity
+  // 1. Tail of wiki/log.md — most recent write activity
   const log = await safeRead(`${vaultPath}/wiki/log.md`)
   if (log) {
     parts.push(`## Recent vault activity (last ${MAX_LOG_LINES} log lines)\n${tail(log, MAX_LOG_LINES)}`)
@@ -145,18 +135,31 @@ export const VaultContextPlugin: Plugin = async ({ client }) => {
 
         output.system.push(`
 <vault-context>
-## Personal knowledge vault — topic index
+IMPORTANT: After analyzing code, debugging, running tests, or making architecture decisions — call vault_write(kind="daily", title="${todayStr()}", content="## HH:MM — What was done\\n\\n...") to save learnings to today's daily note. Do this BEFORE continuing your response.
 
-The index below lists every topic documented in your personal Obsidian vault.
-Use it to decide how to answer before reaching for any tool:
+## Personal knowledge vault — topic tags
 
-- If the topic appears in the index → use vault_read or vault_search to retrieve the page
-- If the topic does NOT appear in the index → do not call vault tools; search the web or answer from general knowledge instead
-- If you are unsure whether a topic is covered → check the index first, then decide
+The tags below list every topic documented in your personal Obsidian vault.
+Use them to decide how to answer before reaching for any tool:
 
-Do not call vault_info() or vault_search() speculatively. The index below is the complete topic map — if something isn't listed here, it isn't in the vault.
+- If the topic matches a tag → use vault_read or vault_search to retrieve the page
+- If the topic does NOT match any tag → do not call vault tools; search the web or answer from general knowledge instead
+
+Do not call vault_info() or vault_search() speculatively. The tags below are the complete topic map.
 
 ${context}
+
+## Vault learnings ritual
+
+Save learnings via vault_write(kind="daily", title="YYYY-MM-DD", content="## HH:MM — Summary\\n\\n..."):
+- After completing a task or fixing a bug
+- After finding root cause of a bug
+- After a discovery during investigation
+- After >5 min stuck on a problem
+- After an architecture decision
+- At end of session (/journal)
+
+Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
 </vault-context>
         `.trim())
 
