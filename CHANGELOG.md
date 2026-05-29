@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-05-29
+## [0.3.0] - 2026-05-29
 
 ### Added
 
@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session plugin** (`opencode/plugins/duckbrain-session-init.js`): OpenCode plugin
   that injects daily notes and the learnings ritual at `session.created` — no AI
   action needed. The learnings ritual moves out of AGENTS.md into the plugin payload.
+
+## [0.2.0] - 2026-05-29
+
+### Added
+
 - **BM25 score exposure**: `vault_search` results now include a numeric `score` field
   from DuckDB's BM25 ranking, letting agents judge result relevance.
 - **Context-aware snippets**: Snippets extracted from ~200 characters around the
