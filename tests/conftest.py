@@ -190,6 +190,31 @@ def sample_pages() -> list[PageMetadata]:
             updated="2026-05-20",
         ),
         PageMetadata(
+            filepath="wiki/concepts/knowledge-graph-architecture.md",
+            title="Knowledge Graph Architecture",
+            kind="concept",
+            tags=["knowledge-graph", "architecture"],
+            body=(
+                "This document explores the architectural choices behind modern "
+                "data systems. We begin with a taxonomy of database paradigms, "
+                "covering relational stores, document databases, and columnar "
+                "engines. Each paradigm has trade-offs in query expressiveness, "
+                "write throughput, and horizontal scalability. The second section "
+                "examines index structures: B-trees, LSM trees, inverted indices, "
+                "and bitmap indexes. We then compare query languages — SQL, MQL, "
+                "and GQL — evaluating their ergonomics for analytical workloads. "
+                "The third section introduces the concept of a knowledge graph: "
+                "a structured representation of entities, their attributes, and "
+                "the relationships between them. Knowledge graphs enable semantic "
+                "querying that goes beyond keyword matching, supporting path "
+                "traversal, subgraph matching, and inference. The final section "
+                "builds a reference architecture that combines DuckDB for analytical "
+                "queries with a graph overlay for relationship traversal."
+            ),
+            created="2026-05-29",
+            updated="2026-05-29",
+        ),
+        PageMetadata(
             filepath="daily/2026-05-28.md",
             title="2026-05-28",
             kind="daily",

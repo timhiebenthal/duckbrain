@@ -163,7 +163,74 @@ def test_search_result_includes_matched_tags(fts_conn) -> None:
         )
 
 
-# ── get_stats tests ───────────────────────────────────────────────────────────
+# ── _extract_snippet tests ────────────────────────────────────────────────────
+
+
+def test_extract_snippet_term_early() -> None:
+    """Snippet shows context around first query term match at body end."""
+    from duckbrain.indexer import _extract_snippet
+
+    body = "The quick brown fox jumps over the lazy dog. Memory is fascinating."
+    snippet = _extract_snippet(body, "Memory")
+    assert "fascinating" in snippet
+    # Match is near body end — no suffix ellipsis needed
+    assert "…" not in snippet
+
+
+def test_extract_snippet_term_buried() -> None:
+    """Snippet extracts context around a term deep in the body."""
+    from duckbrain.indexer import _extract_snippet
+
+    prefix = "Lorem ipsum dolor sit amet. " * 20  # ~500 chars of padding
+    suffix = " Additional content after the match " * 10  # extra after match
+    body = prefix + "The graph database stores relationships." + suffix
+    snippet = _extract_snippet(body, "graph")
+    assert "graph" in snippet.lower()
+    assert snippet.startswith("…")
+    assert snippet.endswith("…")
+
+
+def test_extract_snippet_no_match() -> None:
+    """Fall back to body start when no query term found verbatim."""
+    from duckbrain.indexer import _extract_snippet
+
+    body = "This is a page about data modeling. " * 10  # ~360 chars
+    snippet = _extract_snippet(body, "graph")
+    assert snippet.startswith("This is a page")
+    assert snippet.endswith("…")
+
+
+def test_extract_snippet_short_body() -> None:
+    """Short body — no ellipsis needed."""
+    from duckbrain.indexer import _extract_snippet
+
+    body = "Short."
+    snippet = _extract_snippet(body, "Short")
+    assert "…" not in snippet
+
+
+def test_extract_snippet_multiple_terms() -> None:
+    """First matching term wins for snippet position."""
+    from duckbrain.indexer import _extract_snippet
+
+    body = "Alpha beta gamma. Later: delta graph epsilon."
+    snippet = _extract_snippet(body, "beta graph")
+    assert "beta" in snippet.lower()  # "beta" appears before "graph"
+
+
+def test_search_uses_context_snippets(fts_conn) -> None:
+    """search() results use _extract_snippet, not body[:100]."""
+    from duckbrain.indexer import search
+
+    # Knowledge Graph Architecture has "graph" at position ~535
+    results = search(fts_conn, "graph")
+    kg_result = [r for r in results if r["title"] == "Knowledge Graph Architecture"]
+    assert len(kg_result) == 1
+    snippet = kg_result[0]["snippet"]
+    # Should show context around the matched term, not the body start
+    assert "knowledge" in snippet.lower() or "graph" in snippet.lower()
+    # Should NOT be the body opening ("This document explores...")
+    assert "document explores" not in snippet.lower()
 
 
 def test_get_stats_counts(fts_conn) -> None:
@@ -172,7 +239,7 @@ def test_get_stats_counts(fts_conn) -> None:
 
     stats = get_stats(fts_conn)
     assert stats["entities"] == 1
-    assert stats["concepts"] == 2
+    assert stats["concepts"] == 3
     assert stats["sources"] == 1
     assert stats["synthesis"] == 1
 
@@ -189,15 +256,15 @@ def test_get_stats_tags(fts_conn) -> None:
     # Verify specific expected tags exist
     expected_tags = {
         "open-source", "ai", "memory", "mcp",
-        "agent-memory", "taxonomy",
-        "llm", "capability",
+        "agent-memory", "taxonomy", "architecture",
+        "llm", "capability", "knowledge-graph",
         "duckdb", "comparison",
         "metrics-layer", "mds",
     }
     for tag in expected_tags:
         assert tag in tags, f"Missing tag: {tag}"
     # Total unique tags
-    assert len(tags) == 12
+    assert len(tags) == 14
 
 
 def test_get_stats_last_modified(fts_conn) -> None:
@@ -205,7 +272,7 @@ def test_get_stats_last_modified(fts_conn) -> None:
     from duckbrain.indexer import get_stats
 
     stats = get_stats(fts_conn)
-    assert stats["last_modified"] == "2026-05-28"
+    assert stats["last_modified"] == "2026-05-29"
 
 
 def test_get_stats_empty() -> None:

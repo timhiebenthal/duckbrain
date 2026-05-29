@@ -7,6 +7,39 @@ import duckdb
 from duckbrain import PageMetadata
 
 
+def _extract_snippet(body: str, query: str, context: int = 100) -> str:
+    """Extract ~context chars around the first occurrence of any query term.
+
+    If no term found verbatim (BM25 can match via stemming), falls back to
+    the body start. Uses ``"…"`` (U+2026) as a boundary marker when the
+    extracted context doesn't start/end at the body boundary.
+    """
+    if not body or not query:
+        return body
+
+    body_lower = body.lower()
+    best_pos = len(body)
+
+    for term in query.lower().split():
+        pos = body_lower.find(term)
+        if pos != -1 and pos < best_pos:
+            best_pos = pos
+
+    if best_pos == len(body):
+        # No verbatim term match — fall back to body start
+        if len(body) > context * 2:
+            return body[: context * 2] + "…"
+        return body
+
+    start = max(0, best_pos - context)
+    end = min(len(body), best_pos + context)
+    snippet = body[start:end]
+
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(body) else ""
+    return f"{prefix}{snippet}{suffix}"
+
+
 def build_fts_index(pages: list[PageMetadata]) -> duckdb.DuckDBPyConnection:
     """Build a DuckDB in-memory FTS index from a list of PageMetadata.
 
@@ -116,8 +149,7 @@ def search(
     tag_list = tags if tags else []
     for row in rows:
         title, kind_val, filepath, body, created, updated, score = row
-        # Build a simple snippet: first 100 chars of body
-        snippet = body[:100] + "..." if len(body) > 100 else body
+        snippet = _extract_snippet(body, query)
         results.append(
             {
                 "title": title,
