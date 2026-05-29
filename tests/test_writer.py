@@ -440,46 +440,55 @@ def test_write_daily_no_index_update(temp_vault: Path) -> None:
 # ── build_tags_index tests ────────────────────────────────────────────────────
 
 
-def test_build_tags_index_basic(temp_vault: Path) -> None:
-    """build_tags_index extracts unique tags from all wiki pages."""
+def test_build_tags_index_basic(tmp_path: Path) -> None:
+    """build_tags_index extracts unique tags with counts from all wiki pages."""
     from duckbrain.writer import build_tags_index
 
+    vault = tmp_path / "test-vault"
+    vault.mkdir()
+    (vault / "wiki").mkdir()
+
     # Create two pages with different tags
-    (temp_vault / "wiki" / "entities").mkdir(parents=True, exist_ok=True)
-    (temp_vault / "wiki" / "entities" / "page-a.md").write_text(
+    (vault / "wiki" / "entities").mkdir()
+    (vault / "wiki" / "entities" / "page-a.md").write_text(
         "---\ntitle: Page A\nitem-type: entity\ntags: [ai, memory, mcp]\n---\n\n# Page A\n"
     )
-    (temp_vault / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
-    (temp_vault / "wiki" / "concepts" / "page-b.md").write_text(
+    (vault / "wiki" / "concepts").mkdir()
+    (vault / "wiki" / "concepts" / "page-b.md").write_text(
         "---\ntitle: Page B\nitem-type: concept\ntags: [ai, duckdb, plugin]\n---\n\n# Page B\n"
     )
 
-    build_tags_index(str(temp_vault))
+    build_tags_index(str(vault))
 
-    tags_path = temp_vault / "wiki" / "tags.md"
+    tags_path = vault / "wiki" / "tags.md"
     assert tags_path.exists()
     content = tags_path.read_text()
-    assert "ai" in content
-    assert "memory" in content
-    assert "mcp" in content
-    assert "duckdb" in content
-    assert "plugin" in content
+    assert "ai (2)" in content
+    assert "memory (1)" in content
+    assert "duckdb (1)" in content
 
 
 def test_build_tags_index_sorted(temp_vault: Path) -> None:
-    """Tags in wiki/tags.md are sorted alphabetically."""
+    """Tags sorted by frequency descending, then alphabetically for ties."""
     from duckbrain.writer import build_tags_index
 
     (temp_vault / "wiki" / "entities").mkdir(parents=True, exist_ok=True)
+    # apple appears in 3 pages, mango in 2, zebra in 1
     (temp_vault / "wiki" / "entities" / "x.md").write_text(
         "---\ntitle: X\nitem-type: entity\ntags: [zebra, apple, mango]\n---\n\n# X\n"
+    )
+    (temp_vault / "wiki" / "entities" / "y.md").write_text(
+        "---\ntitle: Y\nitem-type: entity\ntags: [apple, mango]\n---\n\n# Y\n"
+    )
+    (temp_vault / "wiki" / "entities" / "z.md").write_text(
+        "---\ntitle: Z\nitem-type: entity\ntags: [apple]\n---\n\n# Z\n"
     )
 
     build_tags_index(str(temp_vault))
 
     content = (temp_vault / "wiki" / "tags.md").read_text()
-    # Tags should be sorted: apple, mango, zebra
-    assert content.index("apple") < content.index("mango") < content.index("zebra")
+    # apple (3) before mango (2) before zebra (1)
+    assert content.index("apple (3)") < content.index("mango (2)") < content.index("zebra (1)")
 
 
 def test_build_tags_index_empty_vault(tmp_path: Path) -> None:
@@ -498,28 +507,32 @@ def test_build_tags_index_empty_vault(tmp_path: Path) -> None:
     assert "No tags found" in content
 
 
-def test_build_tags_index_deduplicates(temp_vault: Path) -> None:
-    """Same tag across multiple pages appears only once."""
+def test_build_tags_index_deduplicates(tmp_path: Path) -> None:
+    """Same tag across multiple pages appears once with correct count."""
     from duckbrain.writer import build_tags_index
 
-    (temp_vault / "wiki" / "entities").mkdir(parents=True, exist_ok=True)
-    (temp_vault / "wiki" / "entities" / "a.md").write_text(
+    vault = tmp_path / "test-vault"
+    vault.mkdir()
+    (vault / "wiki").mkdir()
+
+    (vault / "wiki" / "entities").mkdir()
+    (vault / "wiki" / "entities" / "a.md").write_text(
         "---\ntitle: A\nitem-type: entity\ntags: [ai, memory]\n---\n\n# A\n"
     )
-    (temp_vault / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
-    (temp_vault / "wiki" / "concepts" / "b.md").write_text(
+    (vault / "wiki" / "concepts").mkdir()
+    (vault / "wiki" / "concepts" / "b.md").write_text(
         "---\ntitle: B\nitem-type: concept\ntags: [ai, duckdb]\n---\n\n# B\n"
     )
 
-    build_tags_index(str(temp_vault))
+    build_tags_index(str(vault))
 
-    content = (temp_vault / "wiki" / "tags.md").read_text()
-    # "ai" appears in both pages but should appear only once in tags.md
+    content = (vault / "wiki" / "tags.md").read_text()
+    assert "ai (2)" in content
     assert content.count("ai") == 1
 
 
 def test_write_page_updates_tags(temp_vault: Path) -> None:
-    """write_page triggers tags.md update with the new page's tags."""
+    """write_page triggers tags.md update with correct counts."""
     from duckbrain.writer import write_page
 
     # Create initial page
@@ -528,15 +541,13 @@ def test_write_page_updates_tags(temp_vault: Path) -> None:
     tags_path = temp_vault / "wiki" / "tags.md"
     assert tags_path.exists()
     content = tags_path.read_text()
-    assert "alpha" in content
-    assert "beta" in content
+    assert "alpha (1)" in content
+    assert "beta (1)" in content
 
     # Create second page with overlapping + new tags
     write_page(str(temp_vault), "concept", "Page Two", "Body", ["beta", "gamma"])
 
     content = tags_path.read_text()
-    assert "alpha" in content
-    assert "beta" in content
-    assert "gamma" in content
-    # beta should appear only once
-    assert content.count("beta") == 1
+    assert "alpha (1)" in content
+    assert "beta (2)" in content  # beta now appears in 2 pages
+    assert "gamma (1)" in content

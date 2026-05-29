@@ -265,13 +265,15 @@ def build_tags_index(vault_path: str) -> None:
     """Regenerate wiki/tags.md with all unique tags across wiki pages.
 
     Scans all .md files under wiki/{entities,concepts,sources,synthesis}/,
-    extracts tags from YAML frontmatter (``tags: [...]`` lines), deduplicates,
-    sorts alphabetically, and writes to wiki/tags.md.
+    extracts tags from YAML frontmatter, counts occurrences, sorts by
+    frequency descending, and writes to wiki/tags.md.
+
+    Output format: ``tag (N)`` where N is the number of pages with that tag.
 
     Args:
         vault_path: Root path of the Obsidian vault.
     """
-    tag_set: set[str] = set()
+    tag_counts: dict[str, int] = {}
     wiki_path = Path(vault_path) / "wiki"
 
     for subdir in ["entities", "concepts", "sources", "synthesis"]:
@@ -289,11 +291,13 @@ def build_tags_index(vault_path: str) -> None:
                 for tag in tags:
                     cleaned = str(tag).strip().strip("\"'")
                     if cleaned:
-                        tag_set.add(cleaned)
+                        tag_counts[cleaned] = tag_counts.get(cleaned, 0) + 1
 
     tags_path = wiki_path / "tags.md"
-    if tag_set:
-        tags_content = "# Vault Tags\n\n" + ", ".join(sorted(tag_set)) + "\n"
+    if tag_counts:
+        sorted_tags = sorted(tag_counts.items(), key=lambda x: (-x[1], x[0]))
+        tag_list = ", ".join(f"{tag} ({count})" for tag, count in sorted_tags)
+        tags_content = f"# Vault Tags\n\n{tag_list}\n"
     else:
         tags_content = "# Vault Tags\n\nNo tags found.\n"
 
