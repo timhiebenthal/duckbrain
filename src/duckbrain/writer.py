@@ -268,11 +268,17 @@ def build_tags_index(vault_path: str) -> None:
     extracts tags from YAML frontmatter, counts occurrences, sorts by
     frequency descending, and writes to wiki/tags.md.
 
+    Excludes structural/kind tags (source, concept, entity, synthesis,
+    clippings) that are directory metadata, not topic signals.
+
     Output format: ``tag (N)`` where N is the number of pages with that tag.
 
     Args:
         vault_path: Root path of the Obsidian vault.
     """
+    # Tags to exclude — structural/kind labels, not meaningful topics
+    EXCLUDED_TAGS = {"source", "concept", "entity", "synthesis", "clippings"}
+
     tag_counts: dict[str, int] = {}
     wiki_path = Path(vault_path) / "wiki"
 
@@ -290,7 +296,7 @@ def build_tags_index(vault_path: str) -> None:
             if isinstance(tags, list):
                 for tag in tags:
                     cleaned = str(tag).strip().strip("\"'")
-                    if cleaned:
+                    if cleaned and cleaned.lower() not in EXCLUDED_TAGS:
                         tag_counts[cleaned] = tag_counts.get(cleaned, 0) + 1
 
     tags_path = wiki_path / "tags.md"
