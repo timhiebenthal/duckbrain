@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OpenCode config templates** in `opencode/`: pre-response learning guard, trigger table, session rituals, `/journal` slash command, and example MCP config. Copy into `~/.config/opencode/` to enable automatic learning capture and session journaling.
 
+### Fixed
+
+- **MCP server name** renamed from `"duckbrain-vault"` to `"duckbrain"` to match the MCP config key users configure.
+
 ## [0.1.0] - 2026-05-28
 
 ### Added
