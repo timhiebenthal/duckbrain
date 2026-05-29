@@ -7,7 +7,7 @@ Usage:
     uv run python tests/benchmarks/search_quality.py                    # save as baseline.json only
     uv run python tests/benchmarks/search_quality.py --label "v0.2"    # also save labeled snapshot
 
-Labeled snapshots go to tests/benchmarks/baselines/<NNN>-<label>.json
+Labeled snapshots go to tests/benchmarks/snapshots/<NNN>-<label>.json
 and persist for comparison across versions.
 """
 
@@ -422,12 +422,12 @@ def run_benchmark(label: str | None = None) -> dict[str, Any]:
     return metrics
 
 
-def _next_sequence(baselines_dir: Path) -> int:
+def _next_sequence(snapshots_dir: Path) -> int:
     """Find the next available sequence number from existing snapshots."""
-    if not baselines_dir.exists():
+    if not snapshots_dir.exists():
         return 1
     max_n = 0
-    for path in baselines_dir.glob("*.json"):
+    for path in snapshots_dir.glob("*.json"):
         m = re.match(r"^(\d+)", path.name)
         if m:
             max_n = max(max_n, int(m.group(1)))
@@ -444,7 +444,7 @@ def main() -> None:
     parser.add_argument(
         "--label", type=str, default=None,
         help="Human-readable label for this snapshot (e.g. 'context-aware-snippets'). "
-             "If given, archives the current baseline.json to baselines/ before overwriting.",
+             "If given, archives the current baseline.json to snapshots/ before overwriting.",
     )
     args = parser.parse_args()
 
@@ -456,9 +456,9 @@ def main() -> None:
 
     # If labeling, archive the old baseline before overwriting
     if label and baseline_path.exists():
-        baselines_dir = Path(__file__).parent / "baselines"
-        baselines_dir.mkdir(exist_ok=True)
-        seq = _next_sequence(baselines_dir)
+        snapshots_dir = Path(__file__).parent / "snapshots"
+        snapshots_dir.mkdir(exist_ok=True)
+        seq = _next_sequence(snapshots_dir)
 
         # Read the old baseline to get its label (describes what produced it)
         old = json.loads(baseline_path.read_text())
@@ -468,7 +468,7 @@ def main() -> None:
             f"Archived snapshot — replaced by: {label}. "
             f"Commit: {old.get('commit', 'unknown')[:8]}."
         )
-        archive_path = baselines_dir / f"{seq:03d}-{_slugify(old_label)}.json"
+        archive_path = snapshots_dir / f"{seq:03d}-{_slugify(old_label)}.json"
         archive_path.write_text(json.dumps(old, indent=2))
         print(f"Archived old baseline → {archive_path}")
         print(f"  Previous label: {old_label}")

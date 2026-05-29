@@ -3,7 +3,7 @@
 Developer-only tool — not shipped with DuckBrain.
 Run with: uv run marimo edit notebooks/benchmark_dashboard.py
 
-Loads all labeled snapshots from tests/benchmarks/baselines/ and renders
+Loads all labeled snapshots from tests/benchmarks/snapshots/ and renders
 actual vs. aspirational metrics with version annotations. Save a new
 snapshot with:
 
@@ -47,13 +47,13 @@ def __(mo):
 @app.cell
 def __():
     def load_baselines() -> list[dict]:
-        """Load all labeled snapshots from baselines/ directory, sorted by sequence."""
-        baselines_dir = (
-            Path(__file__).parent.parent / "tests" / "benchmarks" / "baselines"
+        """Load all labeled snapshots from snapshots/ directory, sorted by sequence."""
+        snapshots_dir = (
+            Path(__file__).parent.parent / "tests" / "benchmarks" / "snapshots"
         )
         snapshots: list[dict] = []
 
-        for path in sorted(baselines_dir.glob("*.json")):
+        for path in sorted(snapshots_dir.glob("*.json")):
             data = json.loads(path.read_text())
             data["_filename"] = path.name
             snapshots.append(data)
@@ -75,7 +75,7 @@ def __():
 
 @app.cell
 def __(mo, snapshots):
-    mo.md(f"**{len(snapshots)} snapshot(s)** loaded from `tests/benchmarks/baselines/`")
+    mo.md(f"**{len(snapshots)} snapshot(s)** loaded from `tests/benchmarks/snapshots/`")
     return
 
 
