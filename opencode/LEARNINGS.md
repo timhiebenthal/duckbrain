@@ -25,15 +25,6 @@ is saved. This is the single most important instruction in this file.
 | **AFTER architecture decisions** | Why X over Y, trade-offs considered |
 | **AFTER >5 min on any problem** | The journey — even if unresolved |
 
-### The learning self-check
-
-After completing any task that involved more than 3 tool calls, run this check:
-
-1. Did I discover something non-obvious? → save immediately
-2. Did I debug something? → save root cause + fix
-3. Did I make a decision worth remembering? → save reasoning
-4. Did I change code in a way someone should know about? → save context
-
 ### Session rituals
 
 **Start of session:**
