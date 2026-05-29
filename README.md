@@ -11,7 +11,7 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read
 Pick your agent:
 
 - [OpenCode](#opencode) — MCP server + session plugin (recommended)
-- [Claude Code](#claude-code) — MCP server + CLAUDE.md
+- [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
 - [Cursor](#cursor) — MCP server + rules
 - [Hermes](#hermes) — MCP server + AGENTS.md
 
@@ -73,6 +73,8 @@ Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
 }
 ```
 
+#### CLAUDE.md
+
 Add to `.claude/CLAUDE.md`:
 
 ```markdown
@@ -83,6 +85,40 @@ Use vault_search() or vault_read() when the query matches vault content.
 Use vault_context() to load daily notes and search in one call.
 After non-trivial work, save learnings with vault_write().
 ```
+
+#### SessionStart hook (optional — auto-context)
+
+For automatic vault awareness without manual tool calls, add a SessionStart hook.
+Download the script (no repo clone needed):
+
+```bash
+mkdir -p ~/.claude/hooks/
+curl -o ~/.claude/hooks/vault-context.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/claude-vault-context.sh
+chmod +x ~/.claude/hooks/vault-context.sh
+```
+
+Add to the same `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/full/path/to/.claude/hooks/vault-context.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook injects vault tags and recent daily notes into Claude's context at session start — no manual `vault_info()` needed.
 
 Restart Claude Code.
 
