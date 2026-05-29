@@ -36,7 +36,7 @@ function tail(text: string, lines: number): string {
 }
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10) // "YYYY-MM-DD"
+  return new Date().toISOString().slice(0, 10)
 }
 
 function recentDates(n: number): string[] {
@@ -54,19 +54,19 @@ function recentDates(n: number): string[] {
 async function loadVaultContext(vaultPath: string): Promise<string> {
   const parts: string[] = []
 
-  // 0. Vault tags — concise topic list (updated by DuckBrain on every write)
+  // Vault tags — concise topic list (updated by DuckBrain on every write)
   const tags = await safeRead(`${vaultPath}/wiki/tags.md`)
   if (tags) {
     parts.push(`## Vault topic tags\n${tags.trim()}`)
   }
 
-  // 1. Tail of wiki/log.md — most recent write activity
+  // Tail of wiki/log.md — most recent write activity
   const log = await safeRead(`${vaultPath}/wiki/log.md`)
   if (log) {
     parts.push(`## Recent vault activity (last ${MAX_LOG_LINES} log lines)\n${tail(log, MAX_LOG_LINES)}`)
   }
 
-  // 3. Recent daily notes — today + yesterday + day before
+  // Recent daily notes — today + yesterday + day before
   const dailyParts: string[] = []
   for (const date of recentDates(MAX_DAILY_NOTES)) {
     const note = await safeRead(`${vaultPath}/daily/${date}.md`)
@@ -82,9 +82,6 @@ async function loadVaultContext(vaultPath: string): Promise<string> {
 }
 
 // ─── compaction snapshot ──────────────────────────────────────────────────────
-// Keeps vault context alive across session compactions.
-// Without this, compaction discards the injected system prompt content
-// and the model loses vault awareness mid-session.
 
 async function loadCompactionSnapshot(vaultPath: string): Promise<string> {
   const log = await safeRead(`${vaultPath}/wiki/log.md`)
@@ -103,35 +100,13 @@ async function loadCompactionSnapshot(vaultPath: string): Promise<string> {
 
 export const VaultContextPlugin: Plugin = async ({ client }) => {
   const vaultPath = process.env.VAULT_PATH
-
-  if (!vaultPath) {
-    // Fail loudly so it's obvious in stderr — not silently
-    process.stderr.write("[vault-context] VAULT_PATH not set — plugin inactive\n")
-    return {}
-  }
-
-  process.stderr.write(`[vault-context] loaded, vault: ${vaultPath}\n`)
+  if (!vaultPath) return {}
 
   return {
-
-    /**
-     * Fires before every LLM call.
-     * Injects the full vault topic index into the system prompt.
-     *
-     * Primary purpose: acts as a routing filter.
-     * The model can see upfront which topics are documented, so it:
-     *   - calls vault_read/vault_search only for topics that ARE in the index
-     *   - falls through to web search or general knowledge for everything else
-     *   - never calls vault_info() speculatively
-     */
     "experimental.chat.system.transform": async (input, output) => {
       try {
         const context = await loadVaultContext(vaultPath)
-
-        if (!context) {
-          process.stderr.write("[vault-context] system.transform: nothing loaded\n")
-          return
-        }
+        if (!context) return
 
         output.system.push(`
 <vault-context>
@@ -162,34 +137,19 @@ Save learnings via vault_write(kind="daily", title="YYYY-MM-DD", content="## HH:
 Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
 </vault-context>
         `.trim())
-
-        process.stderr.write(
-          `[vault-context] system.transform: injected ${context.length} chars\n`
-        )
-      } catch (err) {
+      } catch {
         // Never crash the session over vault unavailability
-        process.stderr.write(`[vault-context] system.transform error: ${err}\n`)
       }
     },
 
-    /**
-     * Fires when OpenCode compacts the session context.
-     * Re-injects a snapshot of current vault state into the continuation prompt
-     * so the model doesn't lose vault awareness after compaction.
-     */
     "experimental.session.compacting": async (input, output) => {
       try {
         const snapshot = await loadCompactionSnapshot(vaultPath)
         output.context.push(snapshot)
-
-        process.stderr.write(
-          `[vault-context] compacting: preserved ${snapshot.length} chars\n`
-        )
-      } catch (err) {
-        process.stderr.write(`[vault-context] compacting error: ${err}\n`)
+      } catch {
+        // Never crash the session over vault unavailability
       }
     },
-
   }
 }
 
