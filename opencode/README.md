@@ -26,7 +26,7 @@ Recommended OpenCode configuration for DuckBrain users. Copy these files to your
    }
    ```
 
-   Alternatively, use the full `opencode.json` template below (adjust paths).
+    Alternatively, use the full `opencode.example.json` template below (adjust paths).
 
 ## Files
 
@@ -34,7 +34,7 @@ Recommended OpenCode configuration for DuckBrain users. Copy these files to your
 |---|---|---|
 | `LEARNINGS.md` | Pre-response learning guard, triggers, session rituals | `~/.config/opencode/LEARNINGS.md` |
 | `commands/journal.md` | `/journal` slash command to dump session progress + learnings | `~/.config/opencode/commands/journal.md` |
-| `opencode.json` | Full config template with MCP wiring | `~/.config/opencode/opencode.json` or project-level `.opencode/opencode.json` |
+| `opencode.example.json` | Full config template with MCP wiring (rename to `opencode.json` to use) | `~/.config/opencode/opencode.json` or project-level `.opencode/opencode.json` |
 
 ## How it works
 
@@ -50,7 +50,7 @@ Next session:  AI reads previous daily → loads context → continues where the
 
 ## MCP configuration
 
-The `opencode.json` template includes a ready-to-use DuckBrain MCP definition. Update `VAULT_PATH` to point at your Obsidian vault, and `directory` to where you cloned DuckBrain:
+The `opencode.example.json` template includes a ready-to-use DuckBrain MCP definition. Update `VAULT_PATH` to point at your Obsidian vault, and `directory` to where you cloned DuckBrain:
 
 ```json
 {

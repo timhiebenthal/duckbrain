@@ -178,7 +178,7 @@ Then wire the instruction file into your `opencode.json`:
 The `opencode/` directory includes:
 - **`LEARNINGS.md`** — pre-response learning guard, trigger table, session rituals, daily note template
 - **`commands/journal.md`** — `/journal` slash command to dump session progress + learnings
-- **`opencode.json`** — full config template with DuckBrain MCP wiring
+- **`opencode.example.json`** — full config template with DuckBrain MCP wiring
 
 See [`opencode/README.md`](opencode/README.md) for detailed setup instructions.
 

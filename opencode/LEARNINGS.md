@@ -5,15 +5,15 @@
 !CRITICAL! Before writing your response to the user, scan what you just did.
 If you edited code, debugged, investigated, or discovered anything
 non-obvious in this turn — save the learning to the vault BEFORE writing
-your response. Do not type a single word to the user until the learning
-is saved. This is the single most important instruction in this file.
+your response. Do not type single word to user until learning saved.
+Most important instruction in this file.
 
 **Checklist (run before every response):**
-- Did I edit code? → vault_write the change + why to today's daily
-- Did I debug? → vault_write the root cause + fix to today's daily
-- Did I learn something? → vault_write it now, not later
-- Did I make a decision? → vault_write the reasoning
-- Is this turn done and I have nothing to save? → fine, proceed
+- Did I edit code? → vault_write change + why to today's daily
+- Did I debug? → vault_write root cause + fix to today's daily
+- Did I learn something? → vault_write now, not later
+- Did I make a decision? → vault_write reasoning
+- Nothing to save? → proceed
 
 ### Triggers (save IMMEDIATELY — do not wait to be asked)
 
@@ -23,29 +23,29 @@ is saved. This is the single most important instruction in this file.
 | **AFTER debugging** | What you tried, what failed, root cause + fix |
 | **AFTER investigating** | Paths explored, dead ends, discoveries |
 | **AFTER architecture decisions** | Why X over Y, trade-offs considered |
-| **AFTER >5 min on any problem** | The journey — even if unresolved |
+| **AFTER >5 min on any problem** | Journey — even if unresolved |
 
 ### Session rituals
 
 **Start of session:**
-- Search for today's daily: `vault_search("YYYY-MM-DD daily")`
-- If found, read it to load prior context
-- If not found, you are free to skip — the /journal command will create it
-- Search for related concepts: `vault_search("keywords from the task")`
+- Search today's daily: `vault_search("YYYY-MM-DD daily")`
+- Found? Read to load prior context
+- Not found? Skip — /journal command creates it
+- Search related concepts: `vault_search("keywords from task")`
 
 **During session:**
-- After every non-trivial task, append progress to today's daily note
-- After every debugging session, write root cause immediately
-- Format progress entries as: `## HH:MM — What was done`
+- After non-trivial task, append progress to daily note
+- After debugging, write root cause immediately
+- Format: `## HH:MM — What was done`
 
 **End of session (or on "/journal"):**
-- Write a comprehensive session summary to the daily note
+- Write session summary to daily note
 - Include: Progress, Learnings, Open questions
-- This is the most important ritual — do not skip it
+- Most important ritual — do not skip
 
 ### How to save
 
-Always `vault_search` first to avoid duplicates.
+`vault_search` first to avoid duplicates.
 
 **Daily notes** — session log, progress, debugging, one-off learnings:
 ```
@@ -67,12 +67,12 @@ vault_write(
 )
 ```
 
-Entity pages (kind="entity"), source pages (kind="source"), and synthesis
-pages (kind="synthesis") follow the same pattern with appropriate content.
+Entity pages (kind="entity"), source pages (kind="source"), synthesis
+pages (kind="synthesis") follow same pattern.
 
 ### Daily note structure
 
-Be caveman-concise. Cut filler words, keep substance.
+Caveman-concise. Cut filler words, keep substance.
 "`Removed self-check — redundant with guard`" not
 "`We decided to remove the self-check section because it was unrealistic.`"
 
@@ -94,7 +94,7 @@ Root cause, non-obvious finding, architecture rationale.
 - Decision pending
 ```
 
-Multiple entries accumulate throughout the day. Each vault_write with
-kind="daily" appends to the same file.
+Multiple entries accumulate through day. Each vault_write
+kind="daily" appends to same file.
 
-A learning saved is a bug not repeated.
+Learning saved is bug not repeated.
