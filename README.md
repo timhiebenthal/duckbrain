@@ -318,41 +318,32 @@ Implementation internals — not needed for installation.
 ### Architecture
 
 ```
-┌──────────────────┐     MCP stdio     ┌─────────────────────────────────┐
-│    AI Agent      │ ◄──────────────►  │      DuckBrain MCP Server       │
-│                  │                   │                                 │
-│  Claude Code     │                   │  vault_info  ──┐                │
-│  OpenCode        │                   │  vault_search ─┤  DuckDB FTS    │
-│  Cursor          │                   │  vault_read  ──┤  Filesystem    │
-│  Hermes          │                   │  vault_write ──┘  Filesystem    │
-└──────────────────┘                   └────────┬────────┬───────────────┘
-                                                │        │
-                    query ┌─────────────────────┘        └── read/write ──┐
-             (full index) ▼                                               ▼  (single file)
-         ┌──────────────────────┐                              ┌───────────────────────────┐
-         │  DuckDB (in-memory)  │                              │    Your Obsidian Vault    │
-         │                      │                              │                           │
-         │  pages (in-memory    │    rebuilt from scratch      │  wiki/entities/           │
-         │  rebuilt every search)│    on every query           │  wiki/concepts/           │
-         │  ┌───────────────┐   │                              │  wiki/sources/            │
-         │  │ filepath      │   │                              │  wiki/synthesis/          │
-         │  │ title         │   │                              │  daily/                   │
-         │  │ kind          │   │                              │  wiki/index.md            │
-         │  │ tags          │   │                              │  wiki/log.md              │
-         │  │ body          │   │                              │                           │
-         │  │ created       │   │                              │                           │
-         │  │ updated       │   │                              │                           │
-         │  └───────────────┘   │                              │                           │
-         │                      │                              │                           │
-         │  BM25 search query:  │                              │                           │
-         │  SELECT ...          │                              │                           │
-         │  FROM pages p        │                              │                           │
-         │  WHERE fts_match_bm25│                              │                           │
-         │    (p.filepath,      │                              │                           │
-         │     'segfault')      │                              │                           │
-         │  AND kind='concept'  │                              │                           │
-         │  ORDER BY score DESC │                              │                           │
-         └──────────────────────┘                              └───────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      AI Agent                                │
+│  ┌──────────────────────────┐  ┌──────────────────────────┐  │
+│  │ MCP Client (stdio)       │  │ Hooks / Plugins          │  │
+│  │  vault_search,           │  │ (SessionStart, system    │  │
+│  │  vault_read, vault_write │  │  transform — inject      │  │
+│  │  vault_context, vault_info│  │  vault context into      │  │
+│  │                          │  │  system prompt)          │  │
+│  └──────────┬───────────────┘  └──────────┬───────────────┘  │
+└─────────────│──────────────────────────────│──────────────────┘
+              │ MCP stdio                    │ reads directly
+              ▼                              ▼ from vault
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│  DuckBrain MCP Server        │  │ Side channel:                │
+│  vault_info   ──► DuckDB FTS │  │  wiki/tags.md                │
+│  vault_search ──► DuckDB FTS │  │  daily/YYYY-MM-DD.md         │
+│  vault_read   ──► Filesystem │  │  wiki/log.md                 │
+│  vault_write  ──► Filesystem │  │                              │
+└──────────────┬───────────────┘  └──────────────────────────────┘
+               │ reads/writes
+               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                     Your Obsidian Vault                              │
+│  wiki/entities/  wiki/concepts/  wiki/sources/  wiki/synthesis/      │
+│  daily/          wiki/index.md   wiki/log.md    wiki/tags.md         │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Reads** vault files directly — no index to sync, no watchers, no duplicate storage
