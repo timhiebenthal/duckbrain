@@ -11,6 +11,7 @@ export const DuckBrainSessionInit = async (ctx) => {
   console.log("[DuckBrainSessionInit] Plugin loaded successfully");
 
   const injectedSessions = new Set();
+  const sessions = {};
 
   async function loadContext() {
     const vaultPath = process.env.VAULT_PATH;
@@ -98,18 +99,31 @@ export const DuckBrainSessionInit = async (ctx) => {
   }
 
   return {
-    // ── System prompt injection (loads dailies, injects everything once per session) ──
+    // ── System prompt injection (context once, journaling nudge on idle) ──
     "experimental.chat.system.transform": async (input, output) => {
       const sid = input.sessionID;
-      if (!sid || injectedSessions.has(sid)) return;
-
-      injectedSessions.add(sid);
-
-      const contextBlock = await loadContext();
-      if (!contextBlock) return;
+      if (!sid) return;
 
       output.system = output.system || [];
-      output.system.push(contextBlock);
+
+      // One-time context injection
+      if (!injectedSessions.has(sid)) {
+        injectedSessions.add(sid);
+        const contextBlock = await loadContext();
+        if (contextBlock) output.system.push(contextBlock);
+      }
+
+      // Journaling nudge after session.idle
+      const session = sessions[sid];
+      if (session?.shouldJournal) {
+        session.shouldJournal = false;
+        output.system.push(
+          "💡 The previous exchange included non-trivial work. " +
+          "If not yet journaled: vault_write(kind=\"daily\", title=\"" +
+          new Date().toISOString().slice(0, 10) + "\", " +
+          "content=\"## HH:MM — What was done\\n\\n...\")"
+        );
+      }
     },
 
     // ── Compaction hook: preserve vault context ──
@@ -125,11 +139,22 @@ If vault context was loaded this session (dailies, search results), include a br
 The goal: vault-loaded knowledge survives session compaction.`);
     },
 
-    // ── Clean up on session deleted ──
+    // ── Session lifecycle ──
     event: async ({ event }) => {
       if (event.type === "session.deleted") {
         const sessionID = event.properties?.info?.id;
-        if (sessionID) injectedSessions.delete(sessionID);
+        if (sessionID) {
+          injectedSessions.delete(sessionID);
+          delete sessions[sessionID];
+        }
+      }
+
+      // Flag journaling after session goes idle (user stopped typing)
+      if (event.type === "session.idle") {
+        const sessionID = event.properties?.info?.id;
+        if (sessionID) {
+          sessions[sessionID] = { shouldJournal: true };
+        }
       }
     },
   };
