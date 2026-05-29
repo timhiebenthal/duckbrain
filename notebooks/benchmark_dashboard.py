@@ -13,49 +13,147 @@ app = marimo.App()
 @app.cell
 def __():
     import marimo as mo
-    return (mo,)
-
-
-@app.cell
-def __():
-    import json
-    import math
-    import statistics
+    import json, math, statistics
     from pathlib import Path
     import altair as alt
-    return (alt, json, math, statistics, Path)
+    return (alt, json, math, mo, statistics, Path)
 
 
 @app.cell
 def __(Path, json):
     d = Path(__file__).parent.parent / "tests" / "benchmarks" / "snapshots"
-    snaps = []
-    for sp in sorted(d.glob("*.json")):
-        item = json.loads(sp.read_text())
-        item["_filename"] = sp.name
-        snaps.append(item)
-    curp = Path(__file__).parent.parent / "tests" / "benchmarks" / "baseline.json"
-    if curp.exists():
-        cur = json.loads(curp.read_text())
-        cur["_filename"] = "current (baseline.json)"
-        snaps.append(cur)
-    snapshots = snaps
+    _snaps = []
+    for _p in sorted(d.glob("*.json")):
+        _it = json.loads(_p.read_text())
+        _it["_filename"] = _p.name
+        _snaps.append(_it)
+    _cur = Path(__file__).parent.parent / "tests" / "benchmarks" / "baseline.json"
+    if _cur.exists():
+        _it = json.loads(_cur.read_text())
+        _it["_filename"] = "current (baseline.json)"
+        _snaps.append(_it)
+    snapshots = _snaps
     return (snapshots,)
 
 
 @app.cell
 def __(mo, snapshots):
-    mo.md("""# DuckBrain Search Benchmark Dashboard""")
-    mo.md(f"**{len(snapshots)} snapshot(s)** from `tests/benchmarks/snapshots/`")
-    mo.md("Save: `uv run python tests/benchmarks/search_quality.py --label \"change\"`")
+    mo.md("# DuckBrain Search Benchmark Dashboard")
+    mo.md(f"**{len(snapshots)} snapshots** from `tests/benchmarks/snapshots/`")
     return
 
 
 @app.cell
-def __(math):
-    def dcg(scores):
-        return sum(s / math.log2(i + 2) for i, s in enumerate(scores))
+def __(snapshots):
+    """Pre-compute all chart + table data in one go. One cell, no name conflicts."""
+    # Summary table
+    summary_rows = []
+    # Snippet chart
+    snippet_data = []
+    # P@5 chart
+    p5_data = []
+    # Per-query detail (latest)
+    detail_rows = []
 
+    for sn in snapshots:
+        sn_avg = sn.get("averages", {}) if isinstance(sn.get("averages"), dict) else {}
+        sn_label = sn.get("label") or sn.get("_filename", "—")
+
+        # Summary
+        sv = sn_avg.get("score_avg")
+        summary_rows.append({
+            "File": sn.get("_filename", "—"),
+            "Label": sn.get("label", "—"),
+            "Commit": str(sn.get("commit", "—"))[:8],
+            "Snip%": f"{sn_avg.get('snippet_containment', 0):.0%}",
+            "P@5": f"{sn_avg.get('precision_at_5', 0):.2f}",
+            "Score": f"{sv:.2f}" if sv else "N/A",
+        })
+
+        # Snippet chart
+        v1 = sn_avg.get("snippet_containment")
+        if v1 is not None:
+            snippet_data.append({"version": sn_label, "value": v1})
+
+        # P@5 chart
+        v2 = sn_avg.get("precision_at_5")
+        if v2 is not None:
+            p5_data.append({"version": sn_label, "value": v2})
+
+    # Detail from latest
+    if snapshots:
+        for q in snapshots[-1].get("per_query", []):
+            if q.get("relevant_count", 0) == 0:
+                continue
+            detail_rows.append({
+                "Query": q["query"],
+                "P@5": f"{q['precision_at_5']:.2f}",
+                "R@5": f"{q['recall_at_5']:.2f}",
+                "Snippet": f"{q['snippet_containment']:.0%}",
+                "Score (avg)": f"{q['score_avg']:.3f}" if q.get("score_avg") else "—",
+                "Results": q["retrieved_count"],
+            })
+
+    return (detail_rows, p5_data, snippet_data, summary_rows)
+
+
+@app.cell
+def __(mo, summary_rows):
+    mo.md("## Snapshots")
+    mo.ui.table(summary_rows)
+    return
+
+
+@app.cell
+def __(alt, mo, snippet_data):
+    mo.md("### Snippet Containment Over Time")
+    if snippet_data:
+        ch1 = (
+            alt.Chart(alt.Data(values=snippet_data))
+            .mark_bar()
+            .encode(
+                x=alt.X("value:Q", scale=alt.Scale(domain=[0, 1]),
+                        axis=alt.Axis(format="%"), title=None),
+                y=alt.Y("version:N", sort=None, title=None),
+                color=alt.Color("version:N", legend=None),
+            )
+            .properties(height=max(60, 30 * len(snippet_data)))
+        )
+        mo.ui.altair_chart(ch1)
+    return
+
+
+@app.cell
+def __(alt, mo, p5_data):
+    mo.md("### Precision@5 Over Time")
+    if p5_data:
+        ch2 = (
+            alt.Chart(alt.Data(values=p5_data))
+            .mark_bar()
+            .encode(
+                x=alt.X("value:Q", scale=alt.Scale(domain=[0, 1]), title=None),
+                y=alt.Y("version:N", sort=None, title=None),
+                color=alt.Color("version:N", legend=None),
+            )
+            .properties(height=max(60, 30 * len(p5_data)))
+        )
+        mo.ui.altair_chart(ch2)
+    return
+
+
+@app.cell
+def __(detail_rows, mo, snapshots):
+    mo.md("## Latest Snapshot — Per-Query Detail")
+    if snapshots:
+        mo.md(f"**{snapshots[-1].get('label', snapshots[-1].get('_filename', ''))}**")
+    mo.ui.table(detail_rows)
+    return
+
+
+# ── NDCG ──
+
+@app.cell
+def __(math):
     def ndcg(retrieved, graded):
         if not graded:
             return 1.0
@@ -64,10 +162,12 @@ def __(math):
         rels = (rels + [0] * k)[:k]
         ideal = sorted(graded.values(), reverse=True)[:k]
         ideal = (ideal + [0] * k)[:k]
-        t = dcg(ideal)
-        return dcg(rels) / t if t > 0 else 1.0
+        def _d(ss):
+            return sum(s / math.log2(i + 2) for i, s in enumerate(ss))
+        t = _d(ideal)
+        return _d(rels) / t if t > 0 else 1.0
 
-    GRADED_RELS = {
+    GRADED = {
         "memory": {"Claude Mem": 3, "Agent Memory Systems": 3,
                    "duckdb-memory-mcp-build-decision": 2, "The LLM Wiki Concept": 1},
         "MCP": {"Claude Mem": 3, "duckdb-memory-mcp-build-decision": 3, "2026-05-28": 1},
@@ -78,141 +178,49 @@ def __(math):
         "Jagged Frontier": {"Jagged Frontier": 3},
         "metrics layer": {"The missing piece of the modern data stack": 3},
     }
-    return (GRADED_RELS, dcg, ndcg)
+    return (GRADED, ndcg)
 
 
 @app.cell
-def __(mo, snapshots):
-    mo.md("## Snapshots")
-    trows = []
-    for st in snapshots:
-        st_avg = st.get("averages", {}) if isinstance(st.get("averages"), dict) else {}
-        st_score = st_avg.get("score_avg")
-        trows.append({
-            "File": st.get("_filename", "—"),
-            "Label": st.get("label", "—"),
-            "Commit": str(st.get("commit", "—"))[:8],
-            "Snip%": f"{st_avg.get('snippet_containment', 0):.0%}",
-            "P@5": f"{st_avg.get('precision_at_5', 0):.2f}",
-            "Score": f"{st_score:.2f}" if st_score else "N/A",
-        })
-    mo.ui.table(trows)
-    return (trows,)
-
-
-@app.cell
-def __(alt, mo, snapshots):
-    mo.md("### Snippet Containment Over Time")
-    sc_data = []
-    for sc_snap in snapshots:
-        sc_lbl = sc_snap.get("label") or sc_snap.get("_filename", "—")
-        sc_avg = sc_snap.get("averages", {}) if isinstance(sc_snap.get("averages"), dict) else {}
-        sc_v = sc_avg.get("snippet_containment")
-        if sc_v is not None:
-            sc_data.append({"label": sc_lbl, "value": sc_v})
-    if sc_data:
-        sc_chart = (
-            alt.Chart(alt.Data(values=sc_data))
-            .mark_bar()
-            .encode(
-                x=alt.X("value:Q", scale=alt.Scale(domain=[0, 1]),
-                        axis=alt.Axis(format="%"), title="Snippet Containment"),
-                y=alt.Y("label:N", sort=None, title=None),
-                color=alt.Color("label:N", legend=None),
-            )
-            .properties(height=max(60, 30 * len(sc_data)))
-        )
-        mo.ui.altair_chart(sc_chart)
-    return
-
-
-@app.cell
-def __(alt, mo, snapshots):
-    mo.md("### Precision@5 Over Time")
-    p5data = []
-    for p5snap in snapshots:
-        p5lbl = p5snap.get("label") or p5snap.get("_filename", "—")
-        p5avg = p5snap.get("averages", {}) if isinstance(p5snap.get("averages"), dict) else {}
-        p5v = p5avg.get("precision_at_5")
-        if p5v is not None:
-            p5data.append({"label": p5lbl, "value": p5v})
-    if p5data:
-        p5chart = (
-            alt.Chart(alt.Data(values=p5data))
-            .mark_bar()
-            .encode(
-                x=alt.X("value:Q", scale=alt.Scale(domain=[0, 1]), title="P@5"),
-                y=alt.Y("label:N", sort=None, title=None),
-                color=alt.Color("label:N", legend=None),
-            )
-            .properties(height=max(60, 30 * len(p5data)))
-        )
-        mo.ui.altair_chart(p5chart)
-    return
-
-
-@app.cell
-def __(mo, snapshots):
-    mo.md("## Latest Snapshot — Per-Query Detail")
-    det_rows = []
+def __(GRADED, ndcg, snapshots, statistics):
+    nd_rows = []
     if snapshots:
-        latest_snap = snapshots[-1]
-        mo.md(f"**{latest_snap.get('label', latest_snap.get('_filename', ''))}**")
-        for rq in latest_snap.get("per_query", []):
-            if rq.get("relevant_count", 0) == 0:
+        for _q in snapshots[-1].get("per_query", []):
+            if _q.get("relevant_count", 0) == 0:
                 continue
-            det_rows.append({
-                "Query": rq["query"],
-                "P@5": f"{rq['precision_at_5']:.2f}",
-                "R@5": f"{rq['recall_at_5']:.2f}",
-                "Snippet": f"{rq['snippet_containment']:.0%}",
-                "Score (avg)": f"{rq['score_avg']:.3f}" if rq.get("score_avg") else "N/A",
-                "Results": rq["retrieved_count"],
-            })
-        mo.ui.table(det_rows)
-    return
+            _grades = GRADED.get(_q["query"], {})
+            if _grades:
+                _n = ndcg(_q.get("retrieved_titles", []), _grades)
+                nd_rows.append({"Query": _q["query"], "NDCG@5": _n})
+    nd_avg = statistics.mean(r["NDCG@5"] for r in nd_rows) if nd_rows else 0
+    return (nd_avg, nd_rows)
 
 
 @app.cell
-def __(GRADED_RELS, mo, ndcg, snapshots, statistics):
+def __(mo, nd_avg, nd_rows):
     mo.md("---")
     mo.md("## Aspirational: NDCG@5")
-    if snapshots:
-        nd_latest = snapshots[-1]
-        ndrows = []
-        for nrq in nd_latest.get("per_query", []):
-            if nrq.get("relevant_count", 0) == 0:
-                continue
-            grades = GRADED_RELS.get(nrq["query"], {})
-            if grades:
-                n = ndcg(nrq.get("retrieved_titles", []), grades)
-                ndrows.append({"Query": nrq["query"], "NDCG@5": n})
-        if ndrows:
-            ndavg = statistics.mean(r["NDCG@5"] for r in ndrows)
-            mo.ui.table(
-                [{"Query": r["Query"], "NDCG@5": f"{r['NDCG@5']:.2f}"} for r in ndrows]
-                + [{"Query": "AVERAGE", "NDCG@5": f"{ndavg:.2f}"}]
-            )
-            mo.callout(
-                f"Average NDCG@5: **{ndavg:.2f}**. "
-                "Improves with better ranking (wikilink boost, snippets). "
-                "Target: ≥0.90.",
-                kind="info",
-            )
+    mo.ui.table(
+        [{"Query": r["Query"], "NDCG@5": f"{r['NDCG@5']:.2f}"} for r in nd_rows]
+        + [{"Query": "AVERAGE", "NDCG@5": f"{nd_avg:.2f}"}]
+    )
+    mo.callout(
+        f"Average NDCG@5: **{nd_avg:.2f}**. Improves with better ranking. Target: ≥0.90.",
+        kind="info",
+    )
     return
 
 
 @app.cell
 def __(mo):
-    mo.md("## Aspirational: Title-Aware Snippets")
-    mo.md("Currently 81%. Extending snippet extraction to page titles would close the gap to 100%.")
-    return
-
-
-@app.cell
-def __(mo):
-    mo.md("""## Aspirational: Wikilink Navigability
-Not measurable yet — [[wikilinks]] not extracted. Currently 0%.""")
+    mo.md(
+        "## Aspirational\n\n"
+        "**Title-aware snippets** — 81% currently. Extending `_extract_snippet()` "
+        "to check page titles would close the gap to 100%.\n\n"
+        "**Wikilink navigability** — 0% currently. `[[wikilinks]]` not yet "
+        "extracted. Implement the wikilink graph spec to unlock backlink "
+        "navigation and ranking."
+    )
     return
 
 
