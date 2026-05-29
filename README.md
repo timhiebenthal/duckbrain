@@ -8,10 +8,10 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read
 
 ## Table of Contents
 
-- [OpenCode](#opencode) — MCP + session plugin (recommended)
-- [Claude Code](#claude-code) — MCP + CLAUDE.md
-- [Cursor](#cursor) — MCP + rules
-- [Hermes](#hermes) — MCP + AGENTS.md
+- [OpenCode (Setup)](#opencode) — MCP + session plugin (recommended)
+- [Claude Code (Setup)](#claude-code) — MCP + CLAUDE.md
+- [Cursor (Setup)](#cursor) — MCP + rules
+- [Hermes (Setup)](#hermes) — MCP + AGENTS.md
 - [Tools](#tools) — vault_search, vault_read, vault_write, vault_context, vault_info
 - [Vault Schema](#vault-schema) — required directory structure
 - [Installing from Source](#installing-from-source)
@@ -46,9 +46,12 @@ Add to `opencode.json`:
 
 ### 2. Session plugin
 
+Download the plugin from GitHub (you don't need the repo cloned):
+
 ```bash
 mkdir -p ~/.config/opencode/plugins/
-cp opencode/plugins/vault-context.ts ~/.config/opencode/plugins/
+curl -o ~/.config/opencode/plugins/vault-context.ts \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/opencode/plugins/vault-context.ts
 ```
 
 **What the plugin does** (invisible to you, visible to the AI):
