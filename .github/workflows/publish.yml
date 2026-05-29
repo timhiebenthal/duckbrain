@@ -15,20 +15,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Resolve version
         id: resolve
         run: |
           NEW=$(grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)
-          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | cut -d'"' -f2 || echo "")
+          LATEST_TAG=$(git tag --sort=-v:refname | grep '^v' | head -1)
+          OLD="${LATEST_TAG#v}"
           echo "version=$NEW" >> $GITHUB_OUTPUT
+          echo "Comparing current version '$NEW' against latest tag '$LATEST_TAG'..."
           if [ -z "$NEW" ] || [ "$NEW" == "$OLD" ]; then
+            echo "Version unchanged ($NEW) — skipping release."
             echo "skip=true" >> $GITHUB_OUTPUT
           elif git ls-remote --tags origin "v$NEW" | grep -q "v$NEW"; then
-            echo "Tag v$NEW already exists — skipping." >&2
+            echo "Tag v$NEW already exists — skipping."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
+            echo "New version detected: $OLD → $NEW"
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
