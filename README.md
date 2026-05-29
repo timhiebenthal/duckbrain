@@ -311,7 +311,7 @@ updated: 2026-05-28
 
 ---
 
-## Naughty Details
+## Nerdy Details
 
 Implementation internals — not needed for installation.
 
