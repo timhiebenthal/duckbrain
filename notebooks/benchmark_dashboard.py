@@ -13,148 +13,160 @@ app = marimo.App()
 @app.cell
 def __():
     import marimo as mo
-    import json, math, statistics
+    import json, statistics
     from pathlib import Path
+    import pandas as pd
     import altair as alt
-    return (alt, json, math, mo, statistics, Path)
+    return (alt, json, mo, pd, statistics, Path)
 
 
 @app.cell
-def __(Path, json):
-    d = Path(__file__).parent.parent / "tests" / "benchmarks" / "snapshots"
-    _snaps = []
-    for _p in sorted(d.glob("*.json")):
-        _it = json.loads(_p.read_text())
-        _it["_filename"] = _p.name
-        _snaps.append(_it)
-    _cur = Path(__file__).parent.parent / "tests" / "benchmarks" / "baseline.json"
-    if _cur.exists():
-        _it = json.loads(_cur.read_text())
-        _it["_filename"] = "current (baseline.json)"
-        _snaps.append(_it)
-    snapshots = _snaps
-    return (snapshots,)
+def __(Path, json, pd):
+    # Load all snapshots into DataFrames
+    snap_dir = Path(__file__).parent.parent / "tests" / "benchmarks" / "snapshots"
 
+    snapshot_rows = []
+    query_rows = []
 
-@app.cell
-def __(mo, snapshots):
-    mo.md("# DuckBrain Search Benchmark Dashboard")
-    mo.md(f"**{len(snapshots)} snapshots** from `tests/benchmarks/snapshots/`")
-    return
-
-
-@app.cell
-def __(snapshots):
-    """Pre-compute all chart + table data in one go. One cell, no name conflicts."""
-    # Summary table
-    summary_rows = []
-    # Snippet chart
-    snippet_data = []
-    # P@5 chart
-    p5_data = []
-    # Per-query detail (latest)
-    detail_rows = []
-
-    for sn in snapshots:
-        sn_avg = sn.get("averages", {}) if isinstance(sn.get("averages"), dict) else {}
-        sn_label = sn.get("label") or sn.get("_filename", "—")
-
-        # Summary
-        sv = sn_avg.get("score_avg")
-        summary_rows.append({
-            "File": sn.get("_filename", "—"),
-            "Label": sn.get("label", "—"),
-            "Commit": str(sn.get("commit", "—"))[:8],
-            "Snip%": f"{sn_avg.get('snippet_containment', 0):.0%}",
-            "P@5": f"{sn_avg.get('precision_at_5', 0):.2f}",
-            "Score": f"{sv:.2f}" if sv else "N/A",
+    for p in sorted(snap_dir.glob("*.json")):
+        snap = json.loads(p.read_text())
+        label = snap.get("label") or p.stem
+        avg = snap.get("averages", {}) if isinstance(snap.get("averages"), dict) else {}
+        snapshot_rows.append({
+            "label": label,
+            "filename": p.name,
+            "commit": str(snap.get("commit", ""))[:8],
+            "snip_containment": avg.get("snippet_containment"),
+            "precision_at_5": avg.get("precision_at_5"),
+            "recall_at_5": avg.get("recall_at_5"),
+            "mrr": avg.get("mrr"),
+            "score_avg": avg.get("score_avg"),
         })
+        for q in snap.get("per_query", []):
+            if q.get("relevant_count", 0) > 0:
+                query_rows.append({
+                    "label": label,
+                    "filename": p.name,
+                    "query": q["query"],
+                    "precision_at_5": q["precision_at_5"],
+                    "recall_at_5": q["recall_at_5"],
+                    "mrr": q["mrr"],
+                    "snip_containment": q["snippet_containment"],
+                    "score_avg": q["score_avg"],
+                    "retrieved_count": q["retrieved_count"],
+                    "relevant_count": q["relevant_count"],
+                    "retrieved_titles": q.get("retrieved_titles", []),
+                })
 
-        # Snippet chart
-        v1 = sn_avg.get("snippet_containment")
-        if v1 is not None:
-            snippet_data.append({"version": sn_label, "value": v1})
+    snapshot_df = pd.DataFrame(snapshot_rows)
+    query_df = pd.DataFrame(query_rows)
 
-        # P@5 chart
-        v2 = sn_avg.get("precision_at_5")
-        if v2 is not None:
-            p5_data.append({"version": sn_label, "value": v2})
+    # Latest snapshot label
+    latest_label = snapshot_df.iloc[-1]["label"] if len(snapshot_df) > 0 else "—"
 
-    # Detail from latest
-    if snapshots:
-        for q in snapshots[-1].get("per_query", []):
-            if q.get("relevant_count", 0) == 0:
-                continue
-            detail_rows.append({
-                "Query": q["query"],
-                "P@5": f"{q['precision_at_5']:.2f}",
-                "R@5": f"{q['recall_at_5']:.2f}",
-                "Snippet": f"{q['snippet_containment']:.0%}",
-                "Score (avg)": f"{q['score_avg']:.3f}" if q.get("score_avg") else "—",
-                "Results": q["retrieved_count"],
-            })
-
-    return (detail_rows, p5_data, snippet_data, summary_rows)
+    return (latest_label, query_df, snapshot_df)
 
 
 @app.cell
-def __(mo, summary_rows):
+def __(mo, snapshot_df):
+    mo.md("# DuckBrain Search Benchmark Dashboard")
+    mo.md(f"**{len(snapshot_df)} snapshots** from `tests/benchmarks/snapshots/`")
+    return
+
+
+# ── Summary table ──
+
+@app.cell
+def __(mo, snapshot_df):
     mo.md("## Snapshots")
-    mo.ui.table(summary_rows)
-    return
+    display_cols = snapshot_df[["label", "commit", "snip_containment", "precision_at_5", "score_avg"]].copy()
+    display_cols["snip_containment"] = display_cols["snip_containment"].apply(
+        lambda x: f"{x:.0%}" if pd.notna(x) else "—"
+    )
+    display_cols["precision_at_5"] = display_cols["precision_at_5"].apply(
+        lambda x: f"{x:.2f}" if pd.notna(x) else "—"
+    )
+    display_cols["score_avg"] = display_cols["score_avg"].apply(
+        lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
+    )
+    display_cols.columns = ["Label", "Commit", "Snip%", "P@5", "Score"]
+    mo.ui.table(display_cols)
+    return (display_cols,)
 
+
+# ── Snippet containment chart ──
 
 @app.cell
-def __(alt, mo, snippet_data):
+def __(alt, mo, snapshot_df):
     mo.md("### Snippet Containment Over Time")
-    if snippet_data:
-        ch1 = (
-            alt.Chart(alt.Data(values=snippet_data))
-            .mark_bar()
-            .encode(
-                x=alt.X("value:Q", scale=alt.Scale(domain=[0, 1]),
-                        axis=alt.Axis(format="%"), title=None),
-                y=alt.Y("version:N", sort=None, title=None),
-                color=alt.Color("version:N", legend=None),
-            )
-            .properties(height=max(60, 30 * len(snippet_data)))
+    sc_chart = (
+        alt.Chart(snapshot_df)
+        .mark_bar()
+        .encode(
+            x=alt.X("snip_containment:Q", scale=alt.Scale(domain=[0, 1]),
+                    axis=alt.Axis(format="%"), title=None),
+            y=alt.Y("label:N", sort=None, title=None),
+            color=alt.Color("label:N", legend=None),
+            tooltip=["label", "snip_containment"],
         )
-        mo.ui.altair_chart(ch1)
-    return
+        .properties(height=max(60, 30 * len(snapshot_df)))
+    )
+    mo.ui.altair_chart(sc_chart)
+    return (sc_chart,)
 
+
+# ── P@5 chart ──
 
 @app.cell
-def __(alt, mo, p5_data):
+def __(alt, mo, snapshot_df):
     mo.md("### Precision@5 Over Time")
-    if p5_data:
-        ch2 = (
-            alt.Chart(alt.Data(values=p5_data))
-            .mark_bar()
-            .encode(
-                x=alt.X("value:Q", scale=alt.Scale(domain=[0, 1]), title=None),
-                y=alt.Y("version:N", sort=None, title=None),
-                color=alt.Color("version:N", legend=None),
-            )
-            .properties(height=max(60, 30 * len(p5_data)))
+    p5_chart = (
+        alt.Chart(snapshot_df)
+        .mark_bar()
+        .encode(
+            x=alt.X("precision_at_5:Q", scale=alt.Scale(domain=[0, 1]), title=None),
+            y=alt.Y("label:N", sort=None, title=None),
+            color=alt.Color("label:N", legend=None),
+            tooltip=["label", "precision_at_5"],
         )
-        mo.ui.altair_chart(ch2)
-    return
+        .properties(height=max(60, 30 * len(snapshot_df)))
+    )
+    mo.ui.altair_chart(p5_chart)
+    return (p5_chart,)
 
+
+# ── Latest per-query detail ──
 
 @app.cell
-def __(detail_rows, mo, snapshots):
+def __(latest_label, mo, query_df):
     mo.md("## Latest Snapshot — Per-Query Detail")
-    if snapshots:
-        mo.md(f"**{snapshots[-1].get('label', snapshots[-1].get('_filename', ''))}**")
-    mo.ui.table(detail_rows)
-    return
+    mo.md(f"**{latest_label}**")
+
+    latest = query_df[query_df["filename"] == query_df["filename"].iloc[-1]]
+    detail = latest[["query", "precision_at_5", "recall_at_5",
+                      "snip_containment", "score_avg", "retrieved_count"]].copy()
+    detail["precision_at_5"] = detail["precision_at_5"].apply(lambda x: f"{x:.2f}")
+    detail["recall_at_5"] = detail["recall_at_5"].apply(lambda x: f"{x:.2f}")
+    detail["snip_containment"] = detail["snip_containment"].apply(lambda x: f"{x:.0%}")
+    detail["score_avg"] = detail["score_avg"].apply(
+        lambda x: f"{x:.3f}" if pd.notna(x) else "—"
+    )
+    detail.columns = ["Query", "P@5", "R@5", "Snippet", "Score (avg)", "Results"]
+    mo.ui.table(detail)
+    return (detail, latest)
 
 
-# ── NDCG ──
+# ── NDCG (aspirational) ──
+
+@app.cell
+def __():
+    import math
+    return (math,)
+
 
 @app.cell
 def __(math):
-    def ndcg(retrieved, graded):
+    def ndcg_score(retrieved, graded):
         if not graded:
             return 1.0
         k = 5
@@ -162,10 +174,12 @@ def __(math):
         rels = (rels + [0] * k)[:k]
         ideal = sorted(graded.values(), reverse=True)[:k]
         ideal = (ideal + [0] * k)[:k]
-        def _d(ss):
-            return sum(s / math.log2(i + 2) for i, s in enumerate(ss))
-        t = _d(ideal)
-        return _d(rels) / t if t > 0 else 1.0
+
+        def dcg(vals):
+            return sum(s / math.log2(i + 2) for i, s in enumerate(vals))
+
+        t = dcg(ideal)
+        return dcg(rels) / t if t > 0 else 1.0
 
     GRADED = {
         "memory": {"Claude Mem": 3, "Agent Memory Systems": 3,
@@ -178,36 +192,35 @@ def __(math):
         "Jagged Frontier": {"Jagged Frontier": 3},
         "metrics layer": {"The missing piece of the modern data stack": 3},
     }
-    return (GRADED, ndcg)
+    return (GRADED, ndcg_score)
 
 
 @app.cell
-def __(GRADED, ndcg, snapshots, statistics):
-    nd_rows = []
-    if snapshots:
-        for _q in snapshots[-1].get("per_query", []):
-            if _q.get("relevant_count", 0) == 0:
-                continue
-            _grades = GRADED.get(_q["query"], {})
-            if _grades:
-                _n = ndcg(_q.get("retrieved_titles", []), _grades)
-                nd_rows.append({"Query": _q["query"], "NDCG@5": _n})
-    nd_avg = statistics.mean(r["NDCG@5"] for r in nd_rows) if nd_rows else 0
-    return (nd_avg, nd_rows)
-
-
-@app.cell
-def __(mo, nd_avg, nd_rows):
+def __(GRADED, mo, ndcg_score, query_df, statistics):
     mo.md("---")
     mo.md("## Aspirational: NDCG@5")
-    mo.ui.table(
-        [{"Query": r["Query"], "NDCG@5": f"{r['NDCG@5']:.2f}"} for r in nd_rows]
-        + [{"Query": "AVERAGE", "NDCG@5": f"{nd_avg:.2f}"}]
-    )
-    mo.callout(
-        f"Average NDCG@5: **{nd_avg:.2f}**. Improves with better ranking. Target: ≥0.90.",
-        kind="info",
-    )
+
+    ndcg_rows = []
+    latest_queries = query_df[query_df["filename"] == query_df["filename"].iloc[-1]]
+    for _, row in latest_queries.iterrows():
+        qname = row["query"]
+        grades = GRADED.get(qname, {})
+        if grades:
+            n = ndcg_score(row["retrieved_titles"], grades)
+            ndcg_rows.append({"Query": qname, "NDCG@5": n})
+
+    if ndcg_rows:
+        ndcg_avg = statistics.mean(r["NDCG@5"] for r in ndcg_rows)
+        mo.ui.table(
+            [{"Query": r["Query"], "NDCG@5": f"{r['NDCG@5']:.2f}"} for r in ndcg_rows]
+            + [{"Query": "AVERAGE", "NDCG@5": f"{ndcg_avg:.2f}"}]
+        )
+        mo.callout(
+            f"Average NDCG@5: **{ndcg_avg:.2f}**. Improves with better ranking. Target: ≥0.90.",
+            kind="info",
+        )
+    else:
+        mo.md("No NDCG data available yet.")
     return
 
 
@@ -218,8 +231,7 @@ def __(mo):
         "**Title-aware snippets** — 81% currently. Extending `_extract_snippet()` "
         "to check page titles would close the gap to 100%.\n\n"
         "**Wikilink navigability** — 0% currently. `[[wikilinks]]` not yet "
-        "extracted. Implement the wikilink graph spec to unlock backlink "
-        "navigation and ranking."
+        "extracted. Implement the wikilink graph spec."
     )
     return
 

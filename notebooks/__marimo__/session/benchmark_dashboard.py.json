@@ -1,0 +1,166 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.23.8",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "51cea117102ff35bd5b6fc30030672c9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "6f6b4401f8061c95c06ec28e21d9b973",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "9559ec31da3faa22ed959147c5113818",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><strong>2 snapshots</strong> from <code>tests/benchmarks/snapshots/</code></span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "48221274742afa3f36df4a32173a6002",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='bkHC-0' random-id='70eb1844-3a7a-ad1b-2e79-dced1f1af2bb'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;_marimo_row_id&#92;&quot;:0,&#92;&quot;Label&#92;&quot;:&#92;&quot;Initial baseline (before improvements)&#92;&quot;,&#92;&quot;Commit&#92;&quot;:&#92;&quot;ea09a9a5&#92;&quot;,&#92;&quot;Snip%&#92;&quot;:&#92;&quot;77%&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;0.82&#92;&quot;,&#92;&quot;Score&#92;&quot;:&#92;&quot;1.10&#92;&quot;},{&#92;&quot;_marimo_row_id&#92;&quot;:1,&#92;&quot;Label&#92;&quot;:&#92;&quot;Score exposure + context-aware snippets + result limit&#92;&quot;,&#92;&quot;Commit&#92;&quot;:&#92;&quot;ea09a9a5&#92;&quot;,&#92;&quot;Snip%&#92;&quot;:&#92;&quot;81%&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;0.82&#92;&quot;,&#92;&quot;Score&#92;&quot;:&#92;&quot;1.10&#92;&quot;}]&quot;' data-total-rows='2' data-size-bytes='281' data-total-columns='5' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='false' data-page-size='10' data-field-types='[[&quot;Label&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;Commit&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;Snip%&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;P@5&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;Score&quot;,[&quot;string&quot;,&quot;str&quot;]]]' data-selection='&quot;multi&quot;' data-show-filters='true' data-show-download='true' data-show-column-summaries='false' data-show-data-types='true' data-show-page-size-selector='false' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-has-stable-row-id='true' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "c63671969038d571bf8cb9726dc3569b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='lEQa-0' random-id='dee2389e-daf6-5ed0-2d70-0f4fca8177d0'><marimo-vega data-initial-value='{}' data-label='null' data-spec='{&quot;config&quot;:{&quot;view&quot;:{&quot;continuousWidth&quot;:300,&quot;continuousHeight&quot;:300}},&quot;data&quot;:{&quot;url&quot;:&quot;data:text/csv;base64,bGFiZWwsZmlsZW5hbWUsY29tbWl0LHNuaXBfY29udGFpbm1lbnQscHJlY2lzaW9uX2F0XzUscmVjYWxsX2F0XzUsbXJyLHNjb3JlX2F2ZwpJbml0aWFsIGJhc2VsaW5lIChiZWZvcmUgaW1wcm92ZW1lbnRzKSwwMDEtaW5pdGlhbC5qc29uLGVhMDlhOWE1LDAuNzczODA5NTIzODA5NTIzOCwwLjgyMTQyODU3MTQyODU3MTQsMC45NjQyODU3MTQyODU3MTQzLDEuMCwxLjEwNDI4NTcxNDI4NTcxNDMKU2NvcmUgZXhwb3N1cmUgKyBjb250ZXh0LWF3YXJlIHNuaXBwZXRzICsgcmVzdWx0IGxpbWl0LDAwMi1zY29yZS1zbmlwcGV0LWxpbWl0Lmpzb24sZWEwOWE5YTUsMC44MDk1MjM4MDk1MjM4MDk1LDAuODIxNDI4NTcxNDI4NTcxNCwxLjAsMS4wLDEuMTA0Mjg1NzE0Mjg1NzE0Mwo=&quot;,&quot;format&quot;:{&quot;type&quot;:&quot;csv&quot;}},&quot;mark&quot;:{&quot;type&quot;:&quot;bar&quot;},&quot;encoding&quot;:{&quot;color&quot;:{&quot;field&quot;:&quot;label&quot;,&quot;legend&quot;:null,&quot;type&quot;:&quot;nominal&quot;},&quot;tooltip&quot;:[{&quot;field&quot;:&quot;label&quot;,&quot;type&quot;:&quot;nominal&quot;},{&quot;field&quot;:&quot;snip_containment&quot;,&quot;type&quot;:&quot;quantitative&quot;}],&quot;x&quot;:{&quot;axis&quot;:{&quot;format&quot;:&quot;%&quot;},&quot;field&quot;:&quot;snip_containment&quot;,&quot;scale&quot;:{&quot;domain&quot;:[0,1]},&quot;title&quot;:null,&quot;type&quot;:&quot;quantitative&quot;},&quot;y&quot;:{&quot;field&quot;:&quot;label&quot;,&quot;sort&quot;:null,&quot;title&quot;:null,&quot;type&quot;:&quot;nominal&quot;}},&quot;height&quot;:60,&quot;&#36;schema&quot;:&quot;https://vega.github.io/schema/vega-lite/v6.4.1.json&quot;}' data-chart-selection='true' data-field-selection='true' data-embed-options='{}'></marimo-vega></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "[W 260529 16:37:46 altair_transformer:82] Failed to convert data to arrow format, falling back to CSV: No module named 'pyarrow'\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "PKri",
+      "code_hash": "b525ee7138c3385c70d7f5cb905c753f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='PKri-0' random-id='302509da-78b4-607e-811e-1c007d31c49b'><marimo-vega data-initial-value='{}' data-label='null' data-spec='{&quot;config&quot;:{&quot;view&quot;:{&quot;continuousWidth&quot;:300,&quot;continuousHeight&quot;:300}},&quot;data&quot;:{&quot;url&quot;:&quot;data:text/csv;base64,bGFiZWwsZmlsZW5hbWUsY29tbWl0LHNuaXBfY29udGFpbm1lbnQscHJlY2lzaW9uX2F0XzUscmVjYWxsX2F0XzUsbXJyLHNjb3JlX2F2ZwpJbml0aWFsIGJhc2VsaW5lIChiZWZvcmUgaW1wcm92ZW1lbnRzKSwwMDEtaW5pdGlhbC5qc29uLGVhMDlhOWE1LDAuNzczODA5NTIzODA5NTIzOCwwLjgyMTQyODU3MTQyODU3MTQsMC45NjQyODU3MTQyODU3MTQzLDEuMCwxLjEwNDI4NTcxNDI4NTcxNDMKU2NvcmUgZXhwb3N1cmUgKyBjb250ZXh0LWF3YXJlIHNuaXBwZXRzICsgcmVzdWx0IGxpbWl0LDAwMi1zY29yZS1zbmlwcGV0LWxpbWl0Lmpzb24sZWEwOWE5YTUsMC44MDk1MjM4MDk1MjM4MDk1LDAuODIxNDI4NTcxNDI4NTcxNCwxLjAsMS4wLDEuMTA0Mjg1NzE0Mjg1NzE0Mwo=&quot;,&quot;format&quot;:{&quot;type&quot;:&quot;csv&quot;}},&quot;mark&quot;:{&quot;type&quot;:&quot;bar&quot;},&quot;encoding&quot;:{&quot;color&quot;:{&quot;field&quot;:&quot;label&quot;,&quot;legend&quot;:null,&quot;type&quot;:&quot;nominal&quot;},&quot;tooltip&quot;:[{&quot;field&quot;:&quot;label&quot;,&quot;type&quot;:&quot;nominal&quot;},{&quot;field&quot;:&quot;precision_at_5&quot;,&quot;type&quot;:&quot;quantitative&quot;}],&quot;x&quot;:{&quot;field&quot;:&quot;precision_at_5&quot;,&quot;scale&quot;:{&quot;domain&quot;:[0,1]},&quot;title&quot;:null,&quot;type&quot;:&quot;quantitative&quot;},&quot;y&quot;:{&quot;field&quot;:&quot;label&quot;,&quot;sort&quot;:null,&quot;title&quot;:null,&quot;type&quot;:&quot;nominal&quot;}},&quot;height&quot;:60,&quot;&#36;schema&quot;:&quot;https://vega.github.io/schema/vega-lite/v6.4.1.json&quot;}' data-chart-selection='true' data-field-selection='true' data-embed-options='{}'></marimo-vega></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "[W 260529 16:37:46 altair_transformer:82] Failed to convert data to arrow format, falling back to CSV: No module named 'pyarrow'\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "Xref",
+      "code_hash": "b0831c5e045553cb92a70a0e9bbadc38",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='Xref-0' random-id='f3baf2c4-7676-eae7-f39f-67f48c3f0cfc'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;_marimo_row_id&#92;&quot;:0,&#92;&quot;Query&#92;&quot;:&#92;&quot;memory&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;0.75&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;67%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;0.425&#92;&quot;,&#92;&quot;Results&#92;&quot;:4},{&#92;&quot;_marimo_row_id&#92;&quot;:1,&#92;&quot;Query&#92;&quot;:&#92;&quot;MCP&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;100%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;0.657&#92;&quot;,&#92;&quot;Results&#92;&quot;:3},{&#92;&quot;_marimo_row_id&#92;&quot;:2,&#92;&quot;Query&#92;&quot;:&#92;&quot;DuckDB&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;100%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;0.473&#92;&quot;,&#92;&quot;Results&#92;&quot;:3},{&#92;&quot;_marimo_row_id&#92;&quot;:3,&#92;&quot;Query&#92;&quot;:&#92;&quot;graph&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;0.50&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;100%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;0.575&#92;&quot;,&#92;&quot;Results&#92;&quot;:2},{&#92;&quot;_marimo_row_id&#92;&quot;:4,&#92;&quot;Query&#92;&quot;:&#92;&quot;knowledge graph&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;0.50&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;100%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;1.110&#92;&quot;,&#92;&quot;Results&#92;&quot;:2},{&#92;&quot;_marimo_row_id&#92;&quot;:5,&#92;&quot;Query&#92;&quot;:&#92;&quot;Jagged Frontier&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;0%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;1.980&#92;&quot;,&#92;&quot;Results&#92;&quot;:1},{&#92;&quot;_marimo_row_id&#92;&quot;:6,&#92;&quot;Query&#92;&quot;:&#92;&quot;metrics layer&#92;&quot;,&#92;&quot;P@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;R@5&#92;&quot;:&#92;&quot;1.00&#92;&quot;,&#92;&quot;Snippet&#92;&quot;:&#92;&quot;100%&#92;&quot;,&#92;&quot;Score (avg)&#92;&quot;:&#92;&quot;2.510&#92;&quot;,&#92;&quot;Results&#92;&quot;:1}]&quot;' data-total-rows='7' data-size-bytes='824' data-total-columns='6' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='false' data-page-size='10' data-field-types='[[&quot;Query&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;P@5&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;R@5&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;Snippet&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;Score (avg)&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;Results&quot;,[&quot;integer&quot;,&quot;int64&quot;]]]' data-selection='&quot;multi&quot;' data-show-filters='true' data-show-download='true' data-show-column-summaries='false' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-has-stable-row-id='true' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "ffa04217f44e4a2773e75640c9d63ad8",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "135ec861e55025f180408f29b27f5e82",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "8b1fbe6791c3789c87b32318a0a9e20c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "a155896072067e04ed0a30b8f44645d5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"aspirational\">Aspirational</h2>\n<span class=\"paragraph\"><strong>Title-aware snippets</strong> \u2014 81% currently. Extending <code>_extract_snippet()</code> to check page titles would close the gap to 100%.</span>\n<span class=\"paragraph\"><strong>Wikilink navigability</strong> \u2014 0% currently. <code>[[wikilinks]]</code> not yet extracted. Implement the wikilink graph spec.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}
