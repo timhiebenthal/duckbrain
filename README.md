@@ -162,28 +162,25 @@ save what you learned so you don't repeat mistakes:
   content="...", tags=["..."]) to create a wiki page.
 ```
 
-**OpenCode** — add to your config's `instructions` field (`opencode.json`):
+**OpenCode** — copy the templates from this repo's [`opencode/`](opencode/) directory:
+
+```bash
+cp opencode/LEARNINGS.md ~/.config/opencode/LEARNINGS.md
+cp opencode/commands/journal.md ~/.config/opencode/commands/journal.md
+```
+
+Then wire the instruction file into your `opencode.json`:
 
 ```json
-"instructions": ["~/.config/opencode/LEARNINGS.md"]
+"instructions": ["/home/your-user/.config/opencode/LEARNINGS.md"]
 ```
 
-Then create `~/.config/opencode/LEARNINGS.md` (or wherever you prefer — any path the config can reach):
+The `opencode/` directory includes:
+- **`LEARNINGS.md`** — pre-response learning guard, trigger table, session rituals, daily note template
+- **`commands/journal.md`** — `/journal` slash command to dump session progress + learnings
+- **`opencode.example.json`** — full config template with DuckBrain MCP wiring
 
-```markdown
-## Session Learnings
-
-When you encounter problems, debug issues, or discover non-obvious solutions,
-save the learning to the vault so it's available in future sessions:
-
-- Append to today's daily note:
-  vault_write(kind="daily", title="short summary", content="what you learned", tags=["debugging", "learned"])
-
-- For reusable concepts/patterns worth revisiting:
-  vault_write(kind="concept", title="Concept Name", content="explanation", tags=["relevant", "tags"])
-
-Do this proactively — don't wait to be asked. A learning saved is a bug not repeated.
-```
+See [`opencode/README.md`](opencode/README.md) for detailed setup instructions.
 
 **Cursor** — add to `.cursorrules`:
 

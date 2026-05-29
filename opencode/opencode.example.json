@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["/home/your-user/.config/opencode/LEARNINGS.md"],
+  "mcp": {
+    "duckbrain": {
+      "type": "local",
+      "command": ["uv", "run", "--directory", "/path/to/duckbrain", "duckbrain"],
+      "enabled": true,
+      "environment": {
+        "VAULT_PATH": "/path/to/your/vault"
+      }
+    }
+  }
+}
