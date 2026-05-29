@@ -10,7 +10,7 @@
  * Vault tags let the model decide intelligently whether to search.
  */
 
-export const DuckBrainSessionInit = async ({ client }) => {
+export const DuckBrainSessionInit = async ({ client, $ }) => {
   const sessions = {};
   const injectedSessions = new Set();
 
@@ -118,21 +118,27 @@ The goal: vault-loaded knowledge survives session compaction.`);
         const todayContent = await readDaily(todayStr);
         const yesterdayContent = await readDaily(yesterdayStr);
 
-        // ── Scan vault for available tags (model uses this to decide if vault is relevant) ──
+        // ── Scan vault for available tags via shell grep (more reliable than Bun.Glob) ──
         let vaultTagsBlock = "";
         try {
-          const vaultFiles = new Bun.Glob("wiki/**/*.md");
           const tagSet = new Set();
-          for await (const filepath of vaultFiles.scan({ cwd: vaultPath, absolute: true })) {
-            try {
-              const text = await Bun.file(filepath).text();
-              for (const line of text.split("\n")) {
-                const m = line.match(/^tags:\s*\[(.+)\]$/);
-                if (m) {
-                  for (const tag of m[1].split(",")) {
-                    const cleaned = tag.trim().replace(/^"+|"+$/g, "").replace(/^'+|'+$/g, "");
-                    if (cleaned) tagSet.add(cleaned);
-                  }
+          const result = await $`grep -rh '^tags:' ${vaultPath}/wiki/ 2>/dev/null || true`.text();
+          for (const line of result.split("\n")) {
+            const m = line.match(/^tags:\s*\[(.+)\]$/);
+            if (m) {
+              for (const tag of m[1].split(",")) {
+                const cleaned = tag.trim().replace(/^["']+|["']+$/g, "");
+                if (cleaned) tagSet.add(cleaned);
+              }
+            }
+          }
+          if (tagSet.size > 0) {
+            vaultTagsBlock = `\n### Vault overview\nAvailable tags (${tagSet.size}): ${[...tagSet].sort().join(", ")}\n\nTopics covered by the vault — use this to decide if vault_context() or vault_search() is worth calling.`;
+          }
+        } catch (err) {
+          console.warn("[DuckBrainSessionInit] Vault tags scan failed:", err?.message || err);
+          vaultTagsBlock = "\n### Vault overview\nTags scan unavailable. Call vault_info() to discover what topics the vault covers.";
+        }
                 }
               }
             } catch {}
