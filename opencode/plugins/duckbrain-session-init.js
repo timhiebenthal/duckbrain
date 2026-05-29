@@ -45,6 +45,12 @@ export const DuckBrainSessionInit = async ({ client }) => {
       "- Caveman-concise. Cut filler words, keep substance",
       "- Expand only when detail matters: debugging root cause, architecture trade-offs",
       "",
+      "### Journaling rule (FOLLOW THIS)",
+      "After EVERY response where you accomplished real work (not just answered a question),",
+      "call vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — What was done\\n\\n...\").",
+      "Do this at the START of your next response, before answering the user.",
+      "Skip for trivial: small questions, single-line answers, reading files.",
+      "",
       "### Vault usage",
       "Call vault_info() to discover available topics and tags, then vault_context(keywords=[...]) to search for relevant pages.",
     ].join("\n");
@@ -65,17 +71,6 @@ export const DuckBrainSessionInit = async ({ client }) => {
       if (!injectedSessions.has(sid)) {
         injectedSessions.add(sid);
         output.system.push(session.contextBlock);
-      }
-
-      // ── Journaling nudge: after each assistant message, remind to save ──
-      if (session.pendingJournal) {
-        session.pendingJournal = false;
-        output.system.push(
-          "💡 You just completed work. If anything non-trivial was accomplished, " +
-          "call vault_write(kind=\"daily\", title=\"" + new Date().toISOString().slice(0, 10) + "\", " +
-          "content=\"## HH:MM — Summary\\n\\n...\") to save learnings to today's daily note. " +
-          "Decide yourself if it's worth logging — skip trivial exchanges."
-        );
       }
     },
 
@@ -99,18 +94,6 @@ The goal: vault-loaded knowledge survives session compaction.`);
         if (sessionID) {
           delete sessions[sessionID];
           injectedSessions.delete(sessionID);
-        }
-        return;
-      }
-
-      // ── After each assistant message, flag journaling for next turn ──
-      if (event.type === "message.updated") {
-        const role = event.properties?.role || event.properties?.info?.role;
-        if (role === "assistant") {
-          const sessionID = event.properties?.sessionID || event.properties?.info?.id;
-          if (sessionID && sessions[sessionID]) {
-            sessions[sessionID].pendingJournal = true;
-          }
         }
         return;
       }
@@ -146,7 +129,7 @@ The goal: vault-loaded knowledge survives session compaction.`);
 
         const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent);
 
-        sessions[sessionID] = { contextBlock, pendingJournal: false };
+        sessions[sessionID] = { contextBlock };
       } catch (err) {
         console.error("[DuckBrainSessionInit] Error loading session context:", err);
       }
