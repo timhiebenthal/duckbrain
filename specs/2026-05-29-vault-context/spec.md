@@ -10,6 +10,8 @@ configure MCP server + install the plugin.
 |---|---|---|---|
 | `vault_context` MCP tool | Keyword search over vault | AI calls after seeing prompt | Model (via AGENTS.md instruction) |
 | OpenCode plugin | Injects dailies + learnings ritual | `session.created` (pre-prompt) | Plugin hook (automatic) |
+| Guard hook | Nudge agent to search vault mid-session | After N tool calls with no vault_search | Plugin hook (automatic) |
+| Compaction hook | Preserve vault context through compaction | Before session compacted | Plugin hook (automatic) |
 
 Daily notes and the learnings ritual are deterministic — no model needed.
 The plugin injects them before the AI sees any prompt. Keyword search requires
@@ -36,6 +38,14 @@ the model to see the prompt first, so that stays as a tool call.
 6. **Learnings ritual injection**: Injects the learnings instructions
    (what to write, when, how) — replaces the ritual currently in
    `~/.config/opencode/AGENTS.md`.
+7. **Guard hook** (`tool.execute.after`): Tracks tool call count per session.
+   When >= N tool calls (default 8) have executed with no `vault_search` or
+   `vault_context` call since last search, injects a nudge: "Consider searching
+   the vault." Fires at most once per search gap to avoid spam.
+8. **Compaction hook** (`experimental.session.compacting`): Appends active
+   vault context (dailies + any search results from current session) to the
+   compaction prompt so important context survives summarization. Without this,
+   all vault-loaded context disappears on compaction.
 
 **OpenCode AGENTS.md** (user's `~/.config/opencode/`):
 7. **Shrinks**: Learnings ritual removed. Replaced with single instruction:
@@ -83,7 +93,7 @@ vault_context
         └── handle_vault_search(vault_path, query=joined_keywords, limit=search_limit)
 ```
 
-**Plugin** — hooks `session.created`:
+**Plugin** — three hooks:
 
 ```
 session.created event
@@ -92,7 +102,23 @@ session.created event
   → reads daily/{today}.md, daily/{yesterday}.md (Bun file API)
   → builds context block: dailies + learnings ritual
   → client.session.prompt({ path: { id }, body: { noReply: true, parts: [...] } })
+
+tool.execute.after event
+  → increment call counter for session
+  → if counter >= N and no vault_search/vault_context since last check:
+      inject nudge text into tool output
+      reset gap flag
+
+experimental.session.compacting event
+  → append vault context section to output.context array
+  → contains: daily note summaries + search result snippets from current session
 ```
+
+**Guard hook logic**:
+- Track `toolCallCount` and `lastVaultSearchAt` per session
+- On `tool.execute.after`: if tool is `vault_search` or `vault_context`, update `lastVaultSearchAt`
+- If `toolCallCount - lastVaultSearchAt >= threshold` (default 8), append nudge to tool output
+- Nudge text: `"You haven't searched the vault in {N} tool calls. Consider vault_search() or vault_context() for relevant context."`
 
 **Learnings ritual** (injected by plugin, removed from AGENTS.md):
 
@@ -151,7 +177,9 @@ session.created event
 - `uv run ruff format --check src/duckbrain/` — all formatted
 - `uv run mypy src/duckbrain/` — 0 errors
 - `uv run pytest` — full suite passes
-- Plugin: manual test — start new session, verify dailies + learnings ritual appear
+- Plugin: manual test — start new session, verify dailies + learnings ritual appear;
+  verify guard hook fires after ~8 tool calls without vault search;
+  verify compaction hook preserves vault context in compaction summary
 - AGENTS.md learnings ritual section can be removed after plugin install
 
 ## Notes

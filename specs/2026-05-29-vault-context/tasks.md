@@ -3,8 +3,9 @@
 ## Overview
 
 Two deliverables: `vault_context` MCP tool (Python) and OpenCode session plugin
-(JavaScript). Plugin injects daily notes + learnings ritual at `session.created`;
-tool handles keyword search when model extracts keywords from prompt.
+(JavaScript). Plugin injects daily notes + learnings ritual at `session.created`,
+nudges agent to search vault mid-session via guard hook, and preserves vault context
+through compaction. Tool handles keyword search when model extracts keywords from prompt.
 
 ## Tasks
 
@@ -105,6 +106,38 @@ tool handles keyword search when model extracts keywords from prompt.
 
 - [ ] **Commit**: `feat: add duckbrain session plugin + update README`
 
+### SPRINT 3: Guard Hook + Compaction Hook
+
+#### Stream A: `opencode/plugins/duckbrain-session-init.js` (guard hook)
+
+- [ ] **Add guard hook** to existing plugin — `tool.execute.after` handler
+  - Per-session state: `toolCallCount` (number), `lastVaultSearchAt` (number)
+  - On each `tool.execute.after`: increment `toolCallCount`
+  - If tool name is `vault_search` or `vault_context`: set `lastVaultSearchAt = toolCallCount`
+  - If `toolCallCount - lastVaultSearchAt >= 8`: append nudge to tool output:
+    `"\n\n---\n💡 Haven't searched the vault in {gap} tool calls. Consider vault_search() or vault_context() for relevant context."`
+  - Track nudge-per-gap flag to avoid repeating within same search gap
+  - Clean up session state on `session.deleted`
+
+- [ ] **Manual verify**: Run a long-ish session, avoid calling vault_search for 8+ tool calls. Confirm nudge text appears appended to the 8th tool's output.
+
+#### Stream A continued (compaction hook)
+
+- [ ] **Add compaction hook** to existing plugin — `experimental.session.compacting` handler
+  - Collect any vault_search/vault_context results that were loaded during this session (store in per-session state from `tool.execute.after`)
+  - On compaction: append context block to `output.context` array:
+    ```
+    ## Vault context (auto-loaded)
+    - Today's daily summary: {first 500 chars or "(not loaded)"}
+    - Yesterday's daily summary: {first 500 chars or "(not loaded)"}
+    - Last search results: {titles of top 5 results or "(none)"}
+    ```
+  - If nothing loaded: still inject a reminder: "No vault context was loaded this session."
+
+- [ ] **Manual verify**: Load vault context at session start, let session run until compaction triggers. Verify vault context appears in compaction summary.
+
+- [ ] **Commit**: `feat: add guard hook + compaction hook to session plugin`
+
 ## Summary
 
 ### Sprint Overview
@@ -112,11 +145,12 @@ tool handles keyword search when model extracts keywords from prompt.
 |--------|------|-------|---------|
 | 1 | vault_context tool | 10 | A (tests + impl), B (server) |
 | 2 | Plugin + Docs | 3 | A (plugin), B (docs) |
+| 3 | Guard + Compaction Hooks | 5 | A (plugin hooks) |
 
 ### Total Effort
-- SPRINTS: 2
-- STREAMS: 4 (2 per sprint)
-- Tasks: 13
+- SPRINTS: 3
+- STREAMS: 5
+- Tasks: 18
 
 ## Notes
 
