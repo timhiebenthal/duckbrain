@@ -140,8 +140,10 @@ The goal: vault-loaded knowledge survives session compaction.`);
           if (tagSet.size > 0) {
             vaultTagsBlock = `\n### Vault overview\nAvailable tags (${tagSet.size}): ${[...tagSet].sort().join(", ")}\n\nTopics covered by the vault — use this to decide if vault_context() or vault_search() is worth calling.`;
           }
-        } catch {
-          // Silent — vault scanning is a nice-to-have, not critical
+        } catch (err) {
+          console.warn("[DuckBrainSessionInit] Vault tags scan failed:", err?.message || err);
+          // Fallback: tell the model to use vault_info to discover vault contents
+          vaultTagsBlock = "\n### Vault overview\nTags scan unavailable. Call vault_info() to discover what topics the vault covers.";
         }
 
         const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent) + vaultTagsBlock;
