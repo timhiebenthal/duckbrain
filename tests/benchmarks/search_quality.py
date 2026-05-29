@@ -443,7 +443,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="DuckBrain search quality benchmark")
     parser.add_argument(
         "--label", type=str, default=None,
-        help="Human-readable label for this snapshot (e.g. 'add-wikilink-graph')",
+        help="Human-readable label for this snapshot (e.g. 'context-aware-snippets'). "
+             "If given, archives the current baseline.json to baselines/ before overwriting.",
     )
     args = parser.parse_args()
 
@@ -451,20 +452,30 @@ def main() -> None:
     metrics = run_benchmark(label=label)
     print_report(metrics, metrics["commit"])
 
-    # Always save current baseline
     baseline_path = Path(__file__).parent / "baseline.json"
-    baseline_path.write_text(json.dumps(metrics, indent=2))
-    print(f"Baseline saved to {baseline_path}")
 
-    # If labeled, also save a snapshot for version comparison
-    if label:
+    # If labeling, archive the old baseline before overwriting
+    if label and baseline_path.exists():
         baselines_dir = Path(__file__).parent / "baselines"
         baselines_dir.mkdir(exist_ok=True)
         seq = _next_sequence(baselines_dir)
-        snap_path = baselines_dir / f"{seq:03d}-{_slugify(label)}.json"
-        snap_path.write_text(json.dumps(metrics, indent=2))
-        print(f"Snapshot saved to {snap_path}")
-        print(f"  Label: {label}")
+
+        # Read the old baseline to get its label (describes what produced it)
+        old = json.loads(baseline_path.read_text())
+        old_label = old.get("label") or "previous-state"
+        old["label"] = old_label
+        old["description"] = (
+            f"Archived snapshot — replaced by: {label}. "
+            f"Commit: {old.get('commit', 'unknown')[:8]}."
+        )
+        archive_path = baselines_dir / f"{seq:03d}-{_slugify(old_label)}.json"
+        archive_path.write_text(json.dumps(old, indent=2))
+        print(f"Archived old baseline → {archive_path}")
+        print(f"  Previous label: {old_label}")
+
+    # Write new baseline
+    baseline_path.write_text(json.dumps(metrics, indent=2))
+    print(f"Baseline saved to {baseline_path}")
     print()
 
 
