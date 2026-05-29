@@ -229,6 +229,24 @@ The `SessionEnd` hook receives the full transcript on stdin. A wrapper script co
 }
 ```
 
+#### Approach 3: Session Plugin (OpenCode, automatic)
+
+OpenCode's [plugin system](https://opencode.ai/docs/plugins) can inject context into every session start automatically — no instructions needed.
+
+Install the DuckBrain session init plugin:
+
+```bash
+mkdir -p ~/.config/opencode/plugins/
+cp opencode/plugins/duckbrain-session-init.js ~/.config/opencode/plugins/
+```
+
+After installing the plugin, the learnings ritual from the `LEARNINGS.md` instruction file is handled automatically — the plugin injects today's daily, yesterday's daily, and the ritual triggers at session start. You can remove the `instructions` array from your `opencode.json` if you were only using it for learnings.
+
+What the plugin does:
+1. On `session.created`, it reads `daily/YYYY-MM-DD.md` and `daily/YYYY-MM-DD-1.md` from the vault
+2. Injects both dailies plus the learnings ritual (triggers, save format, session rituals) into the session prompt
+3. Never crashes the session — errors are silently logged
+
 ### How It Works
 
 During a session, the agent encounters a problem, debugs it, and resolves it:
@@ -352,6 +370,37 @@ Parameters:
 - `title` (required) — page title (or section heading for daily entries)
 - `content` (required) — markdown body (without frontmatter)
 - `tags` (required) — list of tag strings
+
+### `vault_context`
+
+Get session context in a single call: loads today's daily note, yesterday's daily note, and optionally runs a keyword search — all in one round trip.
+
+Designed for agent session startup: instead of calling `vault_read` twice and `vault_search` separately, use one call to load yesterday's context plus today's progress.
+
+```
+> vault_context(keywords=["vector", "embeddings"])
+→ {
+    today_daily: {
+      title: "2026-05-29", filepath: "daily/2026-05-29.md",
+      content: "## 10:30 — Implementing vault_context tool\n\n..."
+    },
+    yesterday_daily: {
+      title: "2026-05-28", filepath: "daily/2026-05-28.md",
+      content: "## 15:00 — Investigating vector search options\n\n..."
+    },
+    search_results: [
+      { title: "Vector Embeddings", kind: "concept",
+        filepath: "wiki/concepts/vector-embeddings.md",
+        snippet: "Approaches for semantic search..." }
+    ]
+  }
+```
+
+Parameters:
+- `keywords` (optional) — list of search keywords, joined into an FTS query
+- `include_dailies` (optional) — include today's and yesterday's daily notes (default `true`)
+- `include_search` (optional) — perform keyword search (default `true`)
+- `search_limit` (optional) — max search results (default `10`)
 
 ## Vault Path
 
