@@ -1,6 +1,6 @@
 [project]
 name = "duckbrain"
-version = "0.1.2"
+version = "0.2.0"
 description = "DuckDB-backed MCP memory server for Obsidian vaults — structured search, read, and write access for AI coding agents."
 readme = "README.md"
 authors = [
@@ -41,7 +41,10 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "altair>=6.1.0",
+    "marimo>=0.23.8",
     "mypy>=2.1.0",
+    "pandas>=2.3.3",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
     "ruff>=0.15.15",

@@ -24,6 +24,7 @@ class SearchResult:
     kind: str
     filepath: str
     snippet: str
+    score: float | None = None
     created: str = ""
     updated: str = ""
     matched_tags: list[str] = field(default_factory=list)

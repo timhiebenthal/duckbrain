@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-29
+
+### Added
+
+- **BM25 score exposure**: `vault_search` results now include a numeric `score` field
+  from DuckDB's BM25 ranking, letting agents judge result relevance.
+- **Context-aware snippets**: Snippets extracted from ~200 characters around the
+  first query term match rather than the first 100 characters of body text.
+  Snippet containment improved from 45% to 81%.
+- **Result limit parameter**: `vault_search("memory", limit=10)` caps results,
+  defaulting to 20. Pass `limit=None` for unlimited.
+- **`matched_tags` populated**: The existing `matched_tags` field on search
+  results is now filled with the tag filter used in the query.
+- **Search quality benchmark**: `tests/benchmarks/search_quality.py` with
+  `--label` flag for versioned snapshot archiving.
+- **Marimo benchmark dashboard**: `uv run marimo edit notebooks/benchmark_dashboard.py`
+  visualizes benchmark snapshots across versions.
+
+### Changed
+
+- **Page count bump**: test fixtures updated from 6 to 7 pages (added knowledge
+  graph concept page with long body for snippet testing).
 ## [0.1.2] - 2026-05-29
 
 ### Added

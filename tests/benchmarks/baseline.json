@@ -1,0 +1,131 @@
+{
+  "commit": "c2501ec5283b02f1aec48d87ee5b6838955c8cf4",
+  "label": "current (v0.2.0)",
+  "dataset": {
+    "total_pages": 8,
+    "total_queries": 8,
+    "queries_with_relevant": 7
+  },
+  "per_query": [
+    {
+      "query": "memory",
+      "relevant_count": 3,
+      "retrieved_count": 4,
+      "precision_at_5": 0.75,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 0.6666666666666666,
+      "score_avg": 0.42500000000000004,
+      "retrieved_titles": [
+        "Agent Memory Systems",
+        "Claude Mem",
+        "duckdb-memory-mcp-build-decision",
+        "The LLM Wiki Concept"
+      ]
+    },
+    {
+      "query": "MCP",
+      "relevant_count": 3,
+      "retrieved_count": 3,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 1.0,
+      "score_avg": 0.6566666666666667,
+      "retrieved_titles": [
+        "duckdb-memory-mcp-build-decision",
+        "Claude Mem",
+        "2026-05-28"
+      ]
+    },
+    {
+      "query": "DuckDB",
+      "relevant_count": 3,
+      "retrieved_count": 3,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 1.0,
+      "score_avg": 0.4733333333333334,
+      "retrieved_titles": [
+        "duckdb-memory-mcp-build-decision",
+        "Agent Memory Systems",
+        "Knowledge Graph Architecture"
+      ]
+    },
+    {
+      "query": "graph",
+      "relevant_count": 1,
+      "retrieved_count": 2,
+      "precision_at_5": 0.5,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 1.0,
+      "score_avg": 0.575,
+      "retrieved_titles": [
+        "Knowledge Graph Architecture",
+        "The LLM Wiki Concept"
+      ]
+    },
+    {
+      "query": "knowledge graph",
+      "relevant_count": 1,
+      "retrieved_count": 2,
+      "precision_at_5": 0.5,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 1.0,
+      "score_avg": 1.1099999999999999,
+      "retrieved_titles": [
+        "Knowledge Graph Architecture",
+        "The LLM Wiki Concept"
+      ]
+    },
+    {
+      "query": "Jagged Frontier",
+      "relevant_count": 1,
+      "retrieved_count": 1,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 0.0,
+      "score_avg": 1.98,
+      "retrieved_titles": [
+        "Jagged Frontier"
+      ]
+    },
+    {
+      "query": "metrics layer",
+      "relevant_count": 1,
+      "retrieved_count": 1,
+      "precision_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 1.0,
+      "score_avg": 2.51,
+      "retrieved_titles": [
+        "The missing piece of the modern data stack"
+      ]
+    },
+    {
+      "query": "nonexistent_term_xyz",
+      "relevant_count": 0,
+      "retrieved_count": 1,
+      "precision_at_5": 0.0,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "snippet_containment": 1.0,
+      "score_avg": 0.52,
+      "retrieved_titles": [
+        "The LLM Wiki Concept"
+      ]
+    }
+  ],
+  "averages": {
+    "precision_at_5": 0.8214285714285714,
+    "recall_at_5": 1.0,
+    "mrr": 1.0,
+    "snippet_containment": 0.8095238095238095,
+    "score_avg": 1.1042857142857143
+  }
+}

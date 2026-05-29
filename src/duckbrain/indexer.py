@@ -7,6 +7,39 @@ import duckdb
 from duckbrain import PageMetadata
 
 
+def _extract_snippet(body: str, query: str, context: int = 100) -> str:
+    """Extract ~context chars around the first occurrence of any query term.
+
+    If no term found verbatim (BM25 can match via stemming), falls back to
+    the body start. Uses ``"…"`` (U+2026) as a boundary marker when the
+    extracted context doesn't start/end at the body boundary.
+    """
+    if not body or not query:
+        return body
+
+    body_lower = body.lower()
+    best_pos = len(body)
+
+    for term in query.lower().split():
+        pos = body_lower.find(term)
+        if pos != -1 and pos < best_pos:
+            best_pos = pos
+
+    if best_pos == len(body):
+        # No verbatim term match — fall back to body start
+        if len(body) > context * 2:
+            return body[: context * 2] + "…"
+        return body
+
+    start = max(0, best_pos - context)
+    end = min(len(body), best_pos + context)
+    snippet = body[start:end]
+
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(body) else ""
+    return f"{prefix}{snippet}{suffix}"
+
+
 def build_fts_index(pages: list[PageMetadata]) -> duckdb.DuckDBPyConnection:
     """Build a DuckDB in-memory FTS index from a list of PageMetadata.
 
@@ -59,6 +92,7 @@ def search(
     query: str,
     kind: str | None = None,
     tags: list[str] | None = None,
+    limit: int | None = 20,
 ) -> list[dict[str, Any]]:
     """Search the FTS index and return matching results.
 
@@ -72,6 +106,9 @@ def search(
         Optional kind filter (e.g. ``"concept"``).
     tags:
         Optional list of tag substrings to filter by.
+    limit:
+        Maximum number of results to return. Pass ``None`` for all results.
+        Defaults to 20.
 
     Returns
     -------
@@ -101,7 +138,7 @@ def search(
         where_clause = " AND " + " AND ".join(conditions)
 
     sql = f"""
-        SELECT p.title, p.kind, p.filepath, p.body, p.created, p.updated
+        SELECT p.title, p.kind, p.filepath, p.body, p.created, p.updated, p.score
         FROM (
             SELECT *, fts_main_pages.match_bm25(p.filepath, $query) AS score
             FROM pages p
@@ -110,21 +147,27 @@ def search(
         ORDER BY score DESC
     """
 
+    if limit is not None:
+        sql += " LIMIT $limit"
+        params["limit"] = limit
+
     rows = conn.execute(sql, params).fetchall()
 
     results: list[dict[str, Any]] = []
+    tag_list = tags if tags else []
     for row in rows:
-        title, kind_val, filepath, body, created, updated = row
-        # Build a simple snippet: first 100 chars of body
-        snippet = body[:100] + "..." if len(body) > 100 else body
+        title, kind_val, filepath, body, created, updated, score = row
+        snippet = _extract_snippet(body, query)
         results.append(
             {
                 "title": title,
                 "kind": kind_val,
                 "filepath": filepath,
                 "snippet": snippet,
+                "score": round(score, 2),
                 "created": created,
                 "updated": updated,
+                "matched_tags": tag_list,
             }
         )
 

@@ -6,3 +6,4 @@ dist/
 *.egg-info/
 .DS_Store
 .env
+__marimo__/
