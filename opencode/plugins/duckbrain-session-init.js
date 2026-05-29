@@ -1,25 +1,18 @@
 /**
  * DuckBrain Session Init Plugin
  *
- * Injects today's + yesterday's daily notes and the learnings ritual into
- * the system prompt (invisible to user). Adds guard hook (nudge after N
- * vault-free tool calls) and compaction hook (preserve vault context).
+ * Injects today's + yesterday's daily notes, the learnings ritual, and vault
+ * tags overview into the system prompt (invisible to user). Compaction hook
+ * preserves vault context through session summarization.
  *
- * Injection is via `experimental.chat.system.transform` — the model sees
- * the context, the user doesn't. `session.created` is observational only;
- * it reads + caches the daily notes for the transform hook to inject.
+ * Injection via `experimental.chat.system.transform` — model sees it, user
+ * doesn't. `session.created` reads + caches dailies for the transform hook.
+ * Vault tags let the model decide intelligently whether to search.
  */
 
 export const DuckBrainSessionInit = async ({ client }) => {
   const sessions = {};
   const injectedSessions = new Set();
-
-  function getSession(id) {
-    if (!sessions[id]) {
-      sessions[id] = { toolCount: 0, lastVaultSearch: 0, nudgeFiredForGap: 0 };
-    }
-    return sessions[id];
-  }
 
   function buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent) {
     return [
@@ -70,26 +63,6 @@ export const DuckBrainSessionInit = async ({ client }) => {
       injectedSessions.add(sid);
       output.system = output.system || [];
       output.system.push(session.contextBlock);
-    },
-
-    // ── Guard hook: nudge after N vault-free tool calls ──
-    "tool.execute.after": (input, output) => {
-      const session = getSession(input.sessionID);
-      session.toolCount++;
-
-      if (input.tool === "vault_search" || input.tool === "vault_context") {
-        session.lastVaultSearch = session.toolCount;
-        return;
-      }
-
-        const threshold = 15;
-      const gap = session.toolCount - session.lastVaultSearch;
-
-      if (gap >= threshold && gap > session.nudgeFiredForGap) {
-        session.nudgeFiredForGap = gap;
-        const nudge = `\n\n---\n💡 Haven't searched the vault in ${gap} tool calls. Consider vault_search() or vault_context() for relevant context.`;
-        output.output = (output.output || "") + nudge;
-      }
     },
 
     // ── Compaction hook: preserve vault context ──
@@ -173,11 +146,8 @@ The goal: vault-loaded knowledge survives session compaction.`);
 
         const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent) + vaultTagsBlock;
 
-        // Cache context block for system.transform to inject (no client.session.prompt — that creates visible UI bloat)
-        sessions[sessionID] = {
-          ...getSession(sessionID),
-          contextBlock,
-        };
+        // Cache context block for system.transform to inject
+        sessions[sessionID] = { contextBlock };
       } catch (err) {
         console.error("[DuckBrainSessionInit] Error loading session context:", err);
       }
