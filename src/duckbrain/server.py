@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Icon
 
+from duckbrain.tools.vault_context import handle_vault_context
 from duckbrain.tools.vault_info import handle_vault_info
 from duckbrain.tools.vault_read import handle_vault_read
 from duckbrain.tools.vault_search import handle_vault_search
@@ -88,6 +89,29 @@ def main() -> None:
             tags: List of tag strings
         """
         return handle_vault_write(vault_path, kind, title, content, tags)
+
+    @server.tool()
+    def vault_context(
+        keywords: list[str] | None = None,
+        include_dailies: bool = True,
+        include_search: bool = True,
+        search_limit: int = 10,
+    ) -> dict:
+        """Get vault context: today's + yesterday's daily notes, plus keyword search.
+
+        Args:
+            keywords: Search keywords (joined with spaces for FTS). None if include_search=False.
+            include_dailies: Whether to include today's and yesterday's daily notes.
+            include_search: Whether to perform keyword search.
+            search_limit: Max search results (default 10).
+        """
+        return handle_vault_context(
+            vault_path,
+            keywords=keywords,
+            include_dailies=include_dailies,
+            include_search=include_search,
+            search_limit=search_limit,
+        )
 
     server.run(transport="stdio")
 
