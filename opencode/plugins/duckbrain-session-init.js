@@ -7,7 +7,8 @@
  * triggers a journaling nudge on the next model call.
  */
 
-export const DuckBrainSessionInit = async ({ client }) => {
+export const DuckBrainSessionInit = async (ctx) => {
+  console.log("[DuckBrainSessionInit] Plugin loaded successfully");
   const sessions = {};
   const injectedSessions = new Set();
 
