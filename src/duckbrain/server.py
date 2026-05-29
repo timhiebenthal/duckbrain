@@ -72,9 +72,10 @@ def main() -> None:
         query: str,
         kind: str | None = None,
         tags: list[str] | None = None,
+        limit: int | None = 20,
     ) -> list[dict]:
         """Full-text search over vault wiki pages. Returns ranked results with snippets."""
-        return handle_vault_search(vault_path, query, kind, tags)
+        return handle_vault_search(vault_path, query, kind, tags, limit=limit)
 
     @server.tool()
     def vault_write(kind: str, title: str, content: str, tags: list[str]) -> dict:

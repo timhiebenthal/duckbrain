@@ -92,6 +92,7 @@ def search(
     query: str,
     kind: str | None = None,
     tags: list[str] | None = None,
+    limit: int | None = 20,
 ) -> list[dict[str, Any]]:
     """Search the FTS index and return matching results.
 
@@ -105,6 +106,9 @@ def search(
         Optional kind filter (e.g. ``"concept"``).
     tags:
         Optional list of tag substrings to filter by.
+    limit:
+        Maximum number of results to return. Pass ``None`` for all results.
+        Defaults to 20.
 
     Returns
     -------
@@ -142,6 +146,10 @@ def search(
         WHERE score IS NOT NULL{where_clause}
         ORDER BY score DESC
     """
+
+    if limit is not None:
+        sql += " LIMIT $limit"
+        params["limit"] = limit
 
     rows = conn.execute(sql, params).fetchall()
 

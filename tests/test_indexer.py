@@ -233,6 +233,34 @@ def test_search_uses_context_snippets(fts_conn) -> None:
     assert "document explores" not in snippet.lower()
 
 
+def test_search_limit(fts_conn) -> None:
+    """search(limit=N) returns at most N results."""
+    from duckbrain.indexer import search
+
+    results = search(fts_conn, "memory", limit=2)
+    assert len(results) <= 2
+
+
+def test_search_limit_none(fts_conn) -> None:
+    """search(limit=None) returns all results (preserves old behavior)."""
+    from duckbrain.indexer import search
+
+    all_results = search(fts_conn, "memory")
+    unlimited = search(fts_conn, "memory", limit=None)
+    assert len(unlimited) == len(all_results)
+
+
+def test_search_default_limit(fts_conn) -> None:
+    """search() without explicit limit uses default (20 or unlimited).
+    With 7 pages in our test dataset, no query returns >7 results,
+    so the default limit of 20 should return all results.
+    """
+    from duckbrain.indexer import search
+
+    results = search(fts_conn, "memory")
+    assert len(results) >= 3  # At minimum we know 3 relevant pages exist
+
+
 def test_get_stats_counts(fts_conn) -> None:
     """Returns dict with correct count per kind matching sample_pages."""
     from duckbrain.indexer import get_stats

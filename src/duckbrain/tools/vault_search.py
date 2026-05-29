@@ -11,6 +11,7 @@ def handle_vault_search(
     query: str,
     kind: str | None = None,
     tags: list[str] | None = None,
+    limit: int | None = 20,
 ) -> list[dict[str, Any]]:
     """Search the vault for pages matching *query* using full-text search.
 
@@ -24,6 +25,9 @@ def handle_vault_search(
         Optional kind filter (e.g. ``"concept"``).
     tags:
         Optional list of tag substrings to filter by.
+    limit:
+        Maximum number of results to return. Pass ``None`` for all results.
+        Defaults to 20.
 
     Returns
     -------
@@ -33,6 +37,6 @@ def handle_vault_search(
     pages = scan_vault(vault_path)
     conn = build_fts_index(pages)
     try:
-        return search(conn, query, kind, tags)
+        return search(conn, query, kind, tags, limit=limit)
     finally:
         conn.close()
