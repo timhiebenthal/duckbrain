@@ -2,12 +2,9 @@
  * DuckBrain Session Init Plugin
  *
  * Injects today's + yesterday's daily notes, the learnings ritual, and vault
- * tags overview into the system prompt (invisible to user). Compaction hook
- * preserves vault context through session summarization.
- *
- * Injection via `experimental.chat.system.transform` — model sees it, user
- * doesn't. `session.created` reads + caches dailies for the transform hook.
- * Vault tags let the model decide intelligently whether to search.
+ * usage prompt into the system prompt (invisible to user). Compaction hook
+ * preserves vault context. After each assistant message, sets a flag that
+ * triggers a journaling nudge on the next model call.
  */
 
 export const DuckBrainSessionInit = async ({ client }) => {
@@ -47,6 +44,9 @@ export const DuckBrainSessionInit = async ({ client }) => {
       "#### Daily note structure",
       "- Caveman-concise. Cut filler words, keep substance",
       "- Expand only when detail matters: debugging root cause, architecture trade-offs",
+      "",
+      "### Vault usage",
+      "Call vault_info() to discover available topics and tags, then vault_context(keywords=[...]) to search for relevant pages.",
     ].join("\n");
   }
 
@@ -55,14 +55,28 @@ export const DuckBrainSessionInit = async ({ client }) => {
     "experimental.chat.system.transform": (input, output) => {
       const sid = input.sessionID;
       if (!sid) return;
-      if (injectedSessions.has(sid)) return;
 
       const session = sessions[sid];
-      if (!session?.contextBlock) return; // not yet loaded
+      if (!session?.contextBlock) return;
 
-      injectedSessions.add(sid);
       output.system = output.system || [];
-      output.system.push(session.contextBlock);
+
+      // One-time context injection
+      if (!injectedSessions.has(sid)) {
+        injectedSessions.add(sid);
+        output.system.push(session.contextBlock);
+      }
+
+      // ── Journaling nudge: after each assistant message, remind to save ──
+      if (session.pendingJournal) {
+        session.pendingJournal = false;
+        output.system.push(
+          "💡 You just completed work. If anything non-trivial was accomplished, " +
+          "call vault_write(kind=\"daily\", title=\"" + new Date().toISOString().slice(0, 10) + "\", " +
+          "content=\"## HH:MM — Summary\\n\\n...\") to save learnings to today's daily note. " +
+          "Decide yourself if it's worth logging — skip trivial exchanges."
+        );
+      }
     },
 
     // ── Compaction hook: preserve vault context ──
@@ -85,6 +99,18 @@ The goal: vault-loaded knowledge survives session compaction.`);
         if (sessionID) {
           delete sessions[sessionID];
           injectedSessions.delete(sessionID);
+        }
+        return;
+      }
+
+      // ── After each assistant message, flag journaling for next turn ──
+      if (event.type === "message.updated") {
+        const role = event.properties?.role || event.properties?.info?.role;
+        if (role === "assistant") {
+          const sessionID = event.properties?.sessionID || event.properties?.info?.id;
+          if (sessionID && sessions[sessionID]) {
+            sessions[sessionID].pendingJournal = true;
+          }
         }
         return;
       }
@@ -118,25 +144,9 @@ The goal: vault-loaded knowledge survives session compaction.`);
         const todayContent = await readDaily(todayStr);
         const yesterdayContent = await readDaily(yesterdayStr);
 
-        // ── Vault overview prompt (model checks proactively, no scan needed) ──
-        let vaultTagsBlock = `\n### Vault usage\nCall vault_info() to discover available topics and tags, then vault_context(keywords=[...]) to search for relevant pages.`;
-                }
-              }
-            } catch {}
-          }
-          if (tagSet.size > 0) {
-            vaultTagsBlock = `\n### Vault overview\nAvailable tags (${tagSet.size}): ${[...tagSet].sort().join(", ")}\n\nTopics covered by the vault — use this to decide if vault_context() or vault_search() is worth calling.`;
-          }
-        } catch (err) {
-          console.warn("[DuckBrainSessionInit] Vault tags scan failed:", err?.message || err);
-          // Fallback: tell the model to use vault_info to discover vault contents
-          vaultTagsBlock = "\n### Vault overview\nTags scan unavailable. Call vault_info() to discover what topics the vault covers.";
-        }
+        const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent);
 
-        const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent) + vaultTagsBlock;
-
-        // Cache context block for system.transform to inject
-        sessions[sessionID] = { contextBlock };
+        sessions[sessionID] = { contextBlock, pendingJournal: false };
       } catch (err) {
         console.error("[DuckBrainSessionInit] Error loading session context:", err);
       }
