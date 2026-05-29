@@ -53,7 +53,10 @@ export const DuckBrainSessionInit = async (ctx) => {
       "Skip for trivial: small questions, single-line answers, reading files.",
       "",
       "### Vault usage",
-      "Call vault_info() to discover available topics and tags, then vault_context(keywords=[...]) to search for relevant pages.",
+      "FIRST: call vault_info() to learn what topics/tags the vault covers.",
+      "THEN for each user query: if it matches vault topics → vault_context(keywords=[...]) or vault_search(...).",
+      "If the query is about something unrelated (e.g. nuclear energy, cooking, sports) → skip vault entirely.",
+      "Don't waste tool calls checking the vault for topics it doesn't cover.",
     ].join("\n");
   }
 
