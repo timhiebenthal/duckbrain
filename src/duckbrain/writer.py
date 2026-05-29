@@ -7,6 +7,8 @@ from typing import Any
 
 import yaml
 
+from duckbrain.scanner import parse_frontmatter
+
 # Map page kind to index section header name
 KIND_TO_SECTION: dict[str, str] = {
     "entity": "Entities",
@@ -246,8 +248,53 @@ def write_page(
     except OSError as e:
         warnings.append(f"Failed to update index.md: {e}")
 
+    # 6. Update wiki/tags.md
+    try:
+        build_tags_index(vault_path)
+    except Exception as e:
+        warnings.append(f"Failed to update tags.md: {e}")
+
     return {
         "success": True,
         "filepath": relative_path,
         "warnings": warnings,
     }
+
+
+def build_tags_index(vault_path: str) -> None:
+    """Regenerate wiki/tags.md with all unique tags across wiki pages.
+
+    Scans all .md files under wiki/{entities,concepts,sources,synthesis}/,
+    extracts tags from YAML frontmatter (``tags: [...]`` lines), deduplicates,
+    sorts alphabetically, and writes to wiki/tags.md.
+
+    Args:
+        vault_path: Root path of the Obsidian vault.
+    """
+    tag_set: set[str] = set()
+    wiki_path = Path(vault_path) / "wiki"
+
+    for subdir in ["entities", "concepts", "sources", "synthesis"]:
+        dir_path = wiki_path / subdir
+        if not dir_path.is_dir():
+            continue
+        for md_file in dir_path.glob("*.md"):
+            try:
+                content = md_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            meta, _ = parse_frontmatter(content)
+            tags = meta.get("tags", [])
+            if isinstance(tags, list):
+                for tag in tags:
+                    cleaned = str(tag).strip().strip("\"'")
+                    if cleaned:
+                        tag_set.add(cleaned)
+
+    tags_path = wiki_path / "tags.md"
+    if tag_set:
+        tags_content = "# Vault Tags\n\n" + ", ".join(sorted(tag_set)) + "\n"
+    else:
+        tags_content = "# Vault Tags\n\nNo tags found.\n"
+
+    tags_path.write_text(tags_content)

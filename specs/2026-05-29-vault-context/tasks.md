@@ -106,37 +106,14 @@ through compaction. Tool handles keyword search when model extracts keywords fro
 
 - [ ] **Commit**: `feat: add duckbrain session plugin + update README`
 
-### SPRINT 3: Guard Hook + Compaction Hook
+### SPRINT 3: Fixes + Refinements (shipped)
 
-#### Stream A: `opencode/plugins/duckbrain-session-init.js` (guard hook)
-
-- [ ] **Add guard hook** to existing plugin — `tool.execute.after` handler
-  - Per-session state: `toolCallCount` (number), `lastVaultSearchAt` (number)
-  - On each `tool.execute.after`: increment `toolCallCount`
-  - If tool name is `vault_search` or `vault_context`: set `lastVaultSearchAt = toolCallCount`
-  - If `toolCallCount - lastVaultSearchAt >= 8`: append nudge to tool output:
-    `"\n\n---\n💡 Haven't searched the vault in {gap} tool calls. Consider vault_search() or vault_context() for relevant context."`
-  - Track nudge-per-gap flag to avoid repeating within same search gap
-  - Clean up session state on `session.deleted`
-
-- [ ] **Manual verify**: Run a long-ish session, avoid calling vault_search for 8+ tool calls. Confirm nudge text appears appended to the 8th tool's output.
-
-#### Stream A continued (compaction hook)
-
-- [ ] **Add compaction hook** to existing plugin — `experimental.session.compacting` handler
-  - Collect any vault_search/vault_context results that were loaded during this session (store in per-session state from `tool.execute.after`)
-  - On compaction: append context block to `output.context` array:
-    ```
-    ## Vault context (auto-loaded)
-    - Today's daily summary: {first 500 chars or "(not loaded)"}
-    - Yesterday's daily summary: {first 500 chars or "(not loaded)"}
-    - Last search results: {titles of top 5 results or "(none)"}
-    ```
-  - If nothing loaded: still inject a reminder: "No vault context was loaded this session."
-
-- [ ] **Manual verify**: Load vault context at session start, let session run until compaction triggers. Verify vault context appears in compaction summary.
-
-- [ ] **Commit**: `feat: add guard hook + compaction hook to session plugin`
+- [x] **Fix: flatten hooks** — hooks were nested under `hooks: { }` key, OpenCode expects top-level. Moved `system.transform`, compaction hook, and `event` to top level of return object.
+- [x] **Fix: invisible injection** — switched from `client.session.prompt()` (creates visible chat messages) to `experimental.chat.system.transform` (system prompt injection). Model sees it, user doesn't. Standard pattern used by context-mode, hindsight, ICM.
+- [x] **Add vault tags overview** — scans `wiki/**/*.md` for YAML `tags:` entries, deduplicates via Set, injects "Available tags (N): ai, mcp, memory, ..." into system prompt. Model can now decide intelligently whether to search vault.
+- [x] **Remove guard hook** — vault tags overview makes it redundant. Model sees what's in the vault and decides for itself. Guard hook was a workaround for lack of vault visibility.
+- [x] **Tune triggers** — learnings ritual triggers changed from "AFTER editing code" to "AFTER completing a task or fixing a bug". Saves less noise.
+- [x] **Commit**: series of atomic commits on `feat/vault-context`
 
 ## Summary
 

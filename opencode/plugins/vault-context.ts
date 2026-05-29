@@ -55,6 +55,12 @@ function recentDates(n: number): string[] {
 async function loadVaultContext(vaultPath: string): Promise<string> {
   const parts: string[] = []
 
+  // 0. Vault tags — concise topic list (updated by DuckBrain on every write)
+  const tags = await safeRead(`${vaultPath}/wiki/tags.md`)
+  if (tags) {
+    parts.push(`## Vault topic tags\n${tags.trim()}`)
+  }
+
   // 1. Vault index (the page catalog — entities, concepts, sources, synthesis)
   const index = await safeRead(`${vaultPath}/wiki/index.md`)
   if (index) {
