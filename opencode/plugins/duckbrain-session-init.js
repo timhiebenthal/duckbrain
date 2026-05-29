@@ -1,12 +1,10 @@
 /**
  * DuckBrain Session Init Plugin
  *
- * Injects today's + yesterday's daily notes, the learnings ritual, vault
- * usage instructions, and journaling rule into the system prompt. Invisible
- * injection via `experimental.chat.system.transform`.
- *
- * Loads dailies synchronously on first model call — no event hooks, no race
- * conditions. Compaction hook preserves vault context.
+ * Injects today's + yesterday's daily notes, learnings ritual, vault tags
+ * overview, and journaling rule into the system prompt. Tags are scanned
+ * from wiki YAML frontmatter via node:fs — model knows vault topics without
+ * calling vault_info().
  */
 
 export const DuckBrainSessionInit = async (ctx) => {
@@ -17,6 +15,9 @@ export const DuckBrainSessionInit = async (ctx) => {
   async function loadContext() {
     const vaultPath = process.env.VAULT_PATH;
     if (!vaultPath) return null;
+
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
 
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
@@ -37,6 +38,38 @@ export const DuckBrainSessionInit = async (ctx) => {
 
     const todayContent = await readDaily(todayStr);
     const yesterdayContent = await readDaily(yesterdayStr);
+
+    // ── Scan wiki directories for tags (model uses this to decide vault relevance) ──
+    let vaultTagsBlock = "";
+    try {
+      const tagSet = new Set();
+      const wikiDirs = ["entities", "concepts", "sources", "synthesis"];
+      for (const dir of wikiDirs) {
+        const dirPath = join(vaultPath, "wiki", dir);
+        let files;
+        try { files = readdirSync(dirPath); } catch { continue; }
+        for (const file of files) {
+          if (!file.endsWith(".md")) continue;
+          try {
+            const text = readFileSync(join(dirPath, file), "utf-8");
+            for (const line of text.split("\n")) {
+              const m = line.match(/^tags:\s*\[(.+)\]$/);
+              if (m) {
+                for (const tag of m[1].split(",")) {
+                  const cleaned = tag.trim().replace(/^["']+|["']+$/g, "");
+                  if (cleaned) tagSet.add(cleaned);
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+      if (tagSet.size > 0) {
+        vaultTagsBlock = `\n### Vault topics (${tagSet.size} tags)\n${[...tagSet].sort().join(", ")}\n\nUse vault_context() or vault_search() for topics above. Skip vault for unrelated queries.`;
+      }
+    } catch {
+      vaultTagsBlock = "\n### Vault topics\nTags scan unavailable. Call vault_info() to discover topics.";
+    }
 
     return [
       "## Session context (auto-loaded from vault)",
@@ -77,11 +110,7 @@ export const DuckBrainSessionInit = async (ctx) => {
       "Do this at the START of your next response, before answering the user.",
       "Skip for trivial: small questions, single-line answers, reading files.",
       "",
-      "### Vault usage",
-      "FIRST: call vault_info() to learn what topics/tags the vault covers.",
-      "THEN for each user query: if it matches vault topics → vault_context(keywords=[...]) or vault_search(...).",
-      "If the query is about something unrelated (e.g. nuclear energy, cooking, sports) → skip vault entirely.",
-      "Don't waste tool calls checking the vault for topics it doesn't cover.",
+      vaultTagsBlock,
     ].join("\n");
   }
 
