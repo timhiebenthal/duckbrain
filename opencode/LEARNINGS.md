@@ -72,10 +72,17 @@ pages (kind="synthesis") follow the same pattern with appropriate content.
 
 ### Daily note structure
 
+Be caveman-concise. Cut filler words, keep substance.
+"`Removed self-check — redundant with guard`" not
+"`We decided to remove the self-check section because it was unrealistic.`"
+
+Expand only when detail matters: debugging root cause, architecture
+trade-offs, non-obvious findings.
+
 ```
 ## HH:MM — What was done (Progress)
 
-Specific changes, decisions, outcomes.
+Concise changes, decisions, outcomes.
 
 ## HH:MM — Discovery: [what was learned] (Learnings)
 

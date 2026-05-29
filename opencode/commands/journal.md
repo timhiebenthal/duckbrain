@@ -21,23 +21,30 @@ If none exists, you'll create one in step 3.
 
 ## 3. Write the session summary
 
+Be concise — caveman-style. Skip filler words and pretty sentences.
+Cut noise, not information. Expand only when detail matters.
+
+**Progress entries:** terse. "`Added build step to CI`" not
+"`I went ahead and added a build step to the CI pipeline.`"
+
+**Learnings:** expand when it matters. Debugging root cause, architecture
+trade-offs, non-obvious findings — keep the detail. Routine changes — keep it brief.
+
 Use vault_write(kind="daily", title="YYYY-MM-DD", ...) with this structure:
 
 ```
 ## Session journal — [time range or brief label]
 
 ## Progress
-- [what was accomplished, chronologically]
+- [concise, chronological]
 
 ## Learnings
-- [every non-obvious discovery]
+- [terse unless detail matters]
 - [bug root cause + how it was found]
 - [architecture decision + trade-off]
 
 ## Open
-- [what remains to be done]
-- [open questions]
-- [next steps for the next session]
+- [concise bullets]
 ```
 
 If the user provided context (e.g., "/journal finished auth, blocked on DB"), incorporate it.
@@ -50,6 +57,6 @@ If yes → also create a wiki concept page or update an existing one.
 ## 5. Confirm
 
 Tell the user what was saved and where. Example:
-"Saved session summary to daily/YYYY-MM-DD.md: 3 progress items, 2 learnings, 1 open question."
+"Saved session summary to daily/2026-05-29.md: 3 progress items, 2 learnings, 1 open question."
 
 $ARGUMENTS: Additional context the user wants included in the journal entry.
