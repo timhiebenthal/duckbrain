@@ -58,45 +58,44 @@ export const DuckBrainSessionInit = async ({ client }) => {
   }
 
   return {
-    hooks: {
-      // ── System prompt injection (invisible context loading) ──
-      "experimental.chat.system.transform": (input, output) => {
-        const sid = input.sessionID;
-        if (!sid) return;
-        if (injectedSessions.has(sid)) return;
+    // ── System prompt injection (invisible context loading) ──
+    "experimental.chat.system.transform": (input, output) => {
+      const sid = input.sessionID;
+      if (!sid) return;
+      if (injectedSessions.has(sid)) return;
 
-        const session = sessions[sid];
-        if (!session?.contextBlock) return; // not yet loaded
+      const session = sessions[sid];
+      if (!session?.contextBlock) return; // not yet loaded
 
-        injectedSessions.add(sid);
-        output.system = output.system || [];
-        output.system.push(session.contextBlock);
-      },
+      injectedSessions.add(sid);
+      output.system = output.system || [];
+      output.system.push(session.contextBlock);
+    },
 
-      // ── Guard hook: nudge after N vault-free tool calls ──
-      "tool.execute.after": (input, output) => {
-        const session = getSession(input.sessionID);
-        session.toolCount++;
+    // ── Guard hook: nudge after N vault-free tool calls ──
+    "tool.execute.after": (input, output) => {
+      const session = getSession(input.sessionID);
+      session.toolCount++;
 
-        if (input.tool === "vault_search" || input.tool === "vault_context") {
-          session.lastVaultSearch = session.toolCount;
-          return;
-        }
+      if (input.tool === "vault_search" || input.tool === "vault_context") {
+        session.lastVaultSearch = session.toolCount;
+        return;
+      }
 
-        const threshold = 8;
-        const gap = session.toolCount - session.lastVaultSearch;
+      const threshold = 8;
+      const gap = session.toolCount - session.lastVaultSearch;
 
-        if (gap >= threshold && gap > session.nudgeFiredForGap) {
-          session.nudgeFiredForGap = gap;
-          const nudge = `\n\n---\n💡 Haven't searched the vault in ${gap} tool calls. Consider vault_search() or vault_context() for relevant context.`;
-          output.output = (output.output || "") + nudge;
-        }
-      },
+      if (gap >= threshold && gap > session.nudgeFiredForGap) {
+        session.nudgeFiredForGap = gap;
+        const nudge = `\n\n---\n💡 Haven't searched the vault in ${gap} tool calls. Consider vault_search() or vault_context() for relevant context.`;
+        output.output = (output.output || "") + nudge;
+      }
+    },
 
-      // ── Compaction hook: preserve vault context ──
-      "experimental.session.compacting": (input, output) => {
-        output.context = output.context || [];
-        output.context.push(`## Vault context preservation
+    // ── Compaction hook: preserve vault context ──
+    "experimental.session.compacting": (input, output) => {
+      output.context = output.context || [];
+      output.context.push(`## Vault context preservation
 
 If vault context was loaded this session (dailies, search results), include a brief summary here:
 - Today's daily note highlights
@@ -104,7 +103,6 @@ If vault context was loaded this session (dailies, search results), include a br
 - Key learnings or decisions documented
 
 The goal: vault-loaded knowledge survives session compaction.`);
-      },
     },
 
     // ── Session lifecycle events ──
