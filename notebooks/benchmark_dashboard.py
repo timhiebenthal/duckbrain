@@ -10,12 +10,6 @@ snapshot with:
     uv run python tests/benchmarks/search_quality.py --label "my-change"
 """
 
-import json
-import math
-import statistics
-from pathlib import Path
-
-import altair as alt
 import marimo
 
 __generated_with = "0.23.8"
@@ -29,25 +23,19 @@ def __():
 
 
 @app.cell
-def __(mo):
-    mo.md(
-        """
-        # DuckBrain Search Benchmark Dashboard
+def __():
+    import json
+    import math
+    import statistics
+    from pathlib import Path
 
-        Developer dashboard for search quality metrics. Not shipped with DuckBrain.
-
-        Run: `uv run marimo edit notebooks/benchmark_dashboard.py`
-
-        Save snapshots: `uv run python tests/benchmarks/search_quality.py --label "description"`
-        """
-    )
-    return
+    import altair as alt
+    return (alt, json, math, statistics, Path)
 
 
 @app.cell
-def __():
+def __(Path, json):
     def load_baselines() -> list[dict]:
-        """Load all labeled snapshots from snapshots/ directory, sorted by sequence."""
         snapshots_dir = (
             Path(__file__).parent.parent / "tests" / "benchmarks" / "snapshots"
         )
@@ -58,7 +46,6 @@ def __():
             data["_filename"] = path.name
             snapshots.append(data)
 
-        # Also load the current baseline.json if it exists
         current_path = (
             Path(__file__).parent.parent / "tests" / "benchmarks" / "baseline.json"
         )
@@ -70,19 +57,26 @@ def __():
         return snapshots
 
     snapshots = load_baselines()
-    return load_baselines, snapshots
+    return (snapshots,)
 
 
 @app.cell
 def __(mo, snapshots):
+    mo.md(
+        """
+        # DuckBrain Search Benchmark Dashboard
+
+        Developer dashboard for search quality metrics. Not shipped with DuckBrain.
+
+        Save snapshots: `uv run python tests/benchmarks/search_quality.py --label "description"`
+        """
+    )
     mo.md(f"**{len(snapshots)} snapshot(s)** loaded from `tests/benchmarks/snapshots/`")
     return
 
 
 @app.cell
-def __():
-    # ── NDCG computation (aspirational metric) ──
-
+def __(math):
     def dcg(scores: list[int]) -> float:
         return sum(s / math.log2(i + 2) for i, s in enumerate(scores))
 
@@ -113,32 +107,31 @@ def __():
         "Jagged Frontier": {"Jagged Frontier": 3},
         "metrics layer": {"The missing piece of the modern data stack": 3},
     }
-    return GRADED_RELS, dcg, ndcg
+    return (GRADED_RELS, dcg, ndcg)
 
 
 @app.cell
 def __(mo, snapshots):
-    # ── Snapshot summary table ──
     mo.md("## Snapshots")
 
     label_rows = []
     for s in snapshots:
+        avg = s.get("averages", {})
+        score_val = avg.get("score_avg")
         label_rows.append({
             "File": s.get("_filename", "—"),
             "Label": s.get("label", "—"),
             "Commit": s.get("commit", "—")[:8],
-            "Snip%": f"{s.get('averages', {}).get('snippet_containment', 0):.0%}",
-            "P@5": f"{s.get('averages', {}).get('precision_at_5', 0):.2f}",
-            "Score": f"{s.get('averages', {}).get('score_avg', 0):.2f}" if s.get("averages", {}).get("score_avg") else "N/A",
+            "Snip%": f"{avg.get('snippet_containment', 0):.0%}",
+            "P@5": f"{avg.get('precision_at_5', 0):.2f}",
+            "Score": f"{score_val:.2f}" if score_val else "N/A",
         })
-
     mo.ui.table(label_rows)
-    return label_rows,
+    return (label_rows,)
 
 
 @app.cell
 def __(alt, mo, snapshots):
-    # ── Snippet containment across snapshots ──
     mo.md("### Snippet Containment Over Time")
 
     snip_versions = []
@@ -162,12 +155,11 @@ def __(alt, mo, snapshots):
             .properties(height=40 + len(snip_versions) * 30)
         )
         mo.ui.altair_chart(chart)
-    return chart, snip_versions
+    return (chart,)
 
 
 @app.cell
 def __(alt, mo, snapshots):
-    # ── P@5 across snapshots ──
     mo.md("### Precision@5 Over Time")
 
     p5_versions = []
@@ -190,12 +182,11 @@ def __(alt, mo, snapshots):
             .properties(height=40 + len(p5_versions) * 30)
         )
         mo.ui.altair_chart(chart)
-    return chart, p5_versions
+    return (chart,)
 
 
 @app.cell
 def __(mo, snapshots):
-    # ── Latest snapshot detail ──
     if not snapshots:
         return
 
@@ -216,12 +207,11 @@ def __(mo, snapshots):
             "Results": q["retrieved_count"],
         })
     mo.ui.table(detail_rows)
-    return detail_rows, latest
+    return (detail_rows, latest)
 
 
 @app.cell
-def __(GRADED_RELS, mo, ndcg, snapshots):
-    # ── NDCG aspirational ──
+def __(GRADED_RELS, mo, ndcg, snapshots, statistics):
     mo.md("---")
     mo.md("## Aspirational: NDCG@5")
 
@@ -237,9 +227,9 @@ def __(GRADED_RELS, mo, ndcg, snapshots):
         if grades:
             n = ndcg(q["retrieved_titles"], grades)
             ndcg_rows.append({"Query": q["query"], "NDCG@5": n})
-    avg_ndcg = statistics.mean(r["NDCG@5"] for r in ndcg_rows)
 
     if ndcg_rows:
+        avg_ndcg = statistics.mean(r["NDCG@5"] for r in ndcg_rows)
         mo.ui.table(
             [{"Query": r["Query"], "NDCG@5": f"{r['NDCG@5']:.2f}"} for r in ndcg_rows]
             + [{"Query": "AVERAGE", "NDCG@5": f"{avg_ndcg:.2f}"}]
@@ -250,7 +240,7 @@ def __(GRADED_RELS, mo, ndcg, snapshots):
             "Target: ≥0.90.",
             kind="info",
         )
-    return avg_ndcg, grades, latest, n, ndcg_rows
+    return ()
 
 
 @app.cell
