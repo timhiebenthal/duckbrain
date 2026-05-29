@@ -1,18 +1,43 @@
 /**
  * DuckBrain Session Init Plugin
  *
- * Injects today's + yesterday's daily notes, the learnings ritual, and vault
- * usage prompt into the system prompt (invisible to user). Compaction hook
- * preserves vault context. After each assistant message, sets a flag that
- * triggers a journaling nudge on the next model call.
+ * Injects today's + yesterday's daily notes, the learnings ritual, vault
+ * usage instructions, and journaling rule into the system prompt. Invisible
+ * injection via `experimental.chat.system.transform`.
+ *
+ * Loads dailies synchronously on first model call — no event hooks, no race
+ * conditions. Compaction hook preserves vault context.
  */
 
 export const DuckBrainSessionInit = async (ctx) => {
   console.log("[DuckBrainSessionInit] Plugin loaded successfully");
-  const sessions = {};
+
   const injectedSessions = new Set();
 
-  function buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent) {
+  async function loadContext() {
+    const vaultPath = process.env.VAULT_PATH;
+    if (!vaultPath) return null;
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    const readDaily = async (dateStr) => {
+      try {
+        const file = Bun.file(`${vaultPath}/daily/${dateStr}.md`);
+        const text = await file.text();
+        return text.trim() || "(no daily note yet)";
+      } catch {
+        return "(no daily note yet)";
+      }
+    };
+
+    const todayContent = await readDaily(todayStr);
+    const yesterdayContent = await readDaily(yesterdayStr);
+
     return [
       "## Session context (auto-loaded from vault)",
       "",
@@ -61,24 +86,18 @@ export const DuckBrainSessionInit = async (ctx) => {
   }
 
   return {
-    // ── System prompt injection (invisible context loading) ──
+    // ── System prompt injection (loads dailies, injects everything once per session) ──
     "experimental.chat.system.transform": async (input, output) => {
       const sid = input.sessionID;
-      if (!sid) return;
+      if (!sid || injectedSessions.has(sid)) return;
 
-      const session = sessions[sid];
-      if (!session) return;
+      injectedSessions.add(sid);
 
-      // Await the context block (session.created may still be loading dailies)
-      const contextBlock = await session.contextReady;
+      const contextBlock = await loadContext();
       if (!contextBlock) return;
 
       output.system = output.system || [];
-
-      if (!injectedSessions.has(sid)) {
-        injectedSessions.add(sid);
-        output.system.push(contextBlock);
-      }
+      output.system.push(contextBlock);
     },
 
     // ── Compaction hook: preserve vault context ──
@@ -94,58 +113,11 @@ If vault context was loaded this session (dailies, search results), include a br
 The goal: vault-loaded knowledge survives session compaction.`);
     },
 
-    // ── Session lifecycle events ──
+    // ── Clean up on session deleted ──
     event: async ({ event }) => {
       if (event.type === "session.deleted") {
         const sessionID = event.properties?.info?.id;
-        if (sessionID) {
-          delete sessions[sessionID];
-          injectedSessions.delete(sessionID);
-        }
-        return;
-      }
-
-      if (event.type !== "session.created") return;
-
-      try {
-        const sessionID = event.properties?.info?.id;
-        if (!sessionID) return;
-
-        // Store session synchronously BEFORE async I/O (race condition fix)
-        let resolveContext;
-        sessions[sessionID] = {
-          contextReady: new Promise((resolve) => { resolveContext = resolve; }),
-        };
-
-        const vaultPath = process.env.VAULT_PATH;
-        if (!vaultPath) return;
-
-        const now = new Date();
-        const todayStr = now.toISOString().slice(0, 10);
-
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-        const readDaily = async (dateStr) => {
-          try {
-            const file = Bun.file(`${vaultPath}/daily/${dateStr}.md`);
-            const text = await file.text();
-            return text.trim() || "(no daily note yet)";
-          } catch {
-            return "(no daily note yet)";
-          }
-        };
-
-        const todayContent = await readDaily(todayStr);
-        const yesterdayContent = await readDaily(yesterdayStr);
-
-        const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent);
-
-        resolveContext(contextBlock);
-      } catch (err) {
-        console.error("[DuckBrainSessionInit] Error loading session context:", err);
-        resolveContext(null);
+        if (sessionID) injectedSessions.delete(sessionID);
       }
     },
   };
