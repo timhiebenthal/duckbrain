@@ -59,19 +59,22 @@ export const DuckBrainSessionInit = async (ctx) => {
 
   return {
     // ── System prompt injection (invisible context loading) ──
-    "experimental.chat.system.transform": (input, output) => {
+    "experimental.chat.system.transform": async (input, output) => {
       const sid = input.sessionID;
       if (!sid) return;
 
       const session = sessions[sid];
-      if (!session?.contextBlock) return;
+      if (!session) return;
+
+      // Await the context block (session.created may still be loading dailies)
+      const contextBlock = await session.contextReady;
+      if (!contextBlock) return;
 
       output.system = output.system || [];
 
-      // One-time context injection
       if (!injectedSessions.has(sid)) {
         injectedSessions.add(sid);
-        output.system.push(session.contextBlock);
+        output.system.push(contextBlock);
       }
     },
 
@@ -105,6 +108,12 @@ The goal: vault-loaded knowledge survives session compaction.`);
         const sessionID = event.properties?.info?.id;
         if (!sessionID) return;
 
+        // Store session synchronously BEFORE async I/O (race condition fix)
+        let resolveContext;
+        sessions[sessionID] = {
+          contextReady: new Promise((resolve) => { resolveContext = resolve; }),
+        };
+
         const vaultPath = process.env.VAULT_PATH;
         if (!vaultPath) return;
 
@@ -130,9 +139,10 @@ The goal: vault-loaded knowledge survives session compaction.`);
 
         const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent);
 
-        sessions[sessionID] = { contextBlock };
+        resolveContext(contextBlock);
       } catch (err) {
         console.error("[DuckBrainSessionInit] Error loading session context:", err);
+        resolveContext(null);
       }
     },
   };
