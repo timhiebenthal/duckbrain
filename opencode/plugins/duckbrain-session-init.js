@@ -15,6 +15,9 @@ export const DuckBrainSessionInit = async (ctx) => {
     const vaultPath = process.env.VAULT_PATH;
     if (!vaultPath) return null;
 
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
 
@@ -35,26 +38,23 @@ export const DuckBrainSessionInit = async (ctx) => {
     const todayContent = await readDaily(todayStr);
     const yesterdayContent = await readDaily(yesterdayStr);
 
-    // ── Scan wiki directories for tags via Bun native fs ──
+    // ── Vault tags scan via node:fs (proven working in OpenCode runtime) ──
     let vaultOverview = "";
     try {
-      const { readdirSync, readFileSync } = await import("fs");
       const tagSet = new Set();
       const wikiDirs = ["entities", "concepts", "sources", "synthesis"];
       for (const dir of wikiDirs) {
-        const dirPath = `${vaultPath}/wiki/${dir}`;
+        const dirPath = join(vaultPath, "wiki", dir);
         let files;
         try { files = readdirSync(dirPath); } catch { continue; }
         for (const file of files) {
           if (!file.endsWith(".md")) continue;
           try {
-            const text = readFileSync(`${dirPath}/${file}`, "utf-8");
-            const m = text.match(/^---\n([\s\S]*?)\n---/);
-            if (m) {
-              const fm = m[1];
-              const tagLine = fm.match(/^tags:\s*\[(.+)\]/m);
-              if (tagLine) {
-                for (const tag of tagLine[1].split(",")) {
+            const text = readFileSync(join(dirPath, file), "utf-8");
+            for (const line of text.split("\n")) {
+              const m = line.match(/^tags:\s*\[(.+)\]$/);
+              if (m) {
+                for (const tag of m[1].split(",")) {
                   const cleaned = tag.trim().replace(/^["']+|["']+$/g, "");
                   if (cleaned) tagSet.add(cleaned);
                 }
@@ -64,7 +64,7 @@ export const DuckBrainSessionInit = async (ctx) => {
         }
       }
       if (tagSet.size > 0) {
-        vaultOverview = `\n### Vault topics (${tagSet.size} tags)\n${[...tagSet].sort().join(", ")}\n\nIf query matches these → vault. If unrelated → skip.`;
+        vaultOverview = `\n### Vault topic coverage (searchable, not pre-loaded)\nThe vault wiki covers these topics: ${[...tagSet].sort().join(", ")}\n\nIf the user's question relates to any of these → vault_context() or vault_search().\nIf unrelated (e.g. cooking, cars, sports) → skip the vault entirely.`;
       }
     } catch {
       vaultOverview = "\n### Vault usage\nCall vault_info() to see what topics the vault covers. Skip vault for unrelated queries.";
