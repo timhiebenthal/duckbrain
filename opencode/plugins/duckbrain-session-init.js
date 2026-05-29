@@ -73,6 +73,8 @@ export const DuckBrainSessionInit = async (ctx) => {
     }
 
     return [
+      "IMPORTANT: After analyzing code, debugging, running tests, or making architecture decisions — call vault_write(kind=\"daily\", title=\"" + todayStr + "\", content=\"## HH:MM — What was done\\n\\n...\") to save learnings to today's daily note. Do this BEFORE continuing your response.",
+      "",
       "## Session context (auto-loaded from vault)",
       "",
       `### Today's daily: ${todayStr}`,
@@ -90,9 +92,6 @@ export const DuckBrainSessionInit = async (ctx) => {
       "- After an architecture decision",
       "- At end of session (/journal)",
       "Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.",
-      "",
-      "### Journaling rule",
-      "After EVERY non-trivial response, BEFORE your next sentence: vault_write(kind=\"daily\", title=\"YYYY-MM-DD\", content=\"## HH:MM — What was done\\n\\n...\"). Skip trivial Q&A only.",
       "",
       vaultTagsBlock,
     ].join("\n");
