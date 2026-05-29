@@ -120,6 +120,37 @@ Add to the same `.claude/settings.json`:
 
 The hook injects vault tags and recent daily notes into Claude's context at session start — no manual `vault_info()` needed.
 
+#### SessionEnd hook (optional — auto-journal)
+
+Auto-stamp session end in today's daily note:
+
+```bash
+curl -o ~/.claude/hooks/vault-journal.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/claude-vault-journal.sh
+chmod +x ~/.claude/hooks/vault-journal.sh
+```
+
+Add to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/full/path/to/.claude/hooks/vault-journal.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Appends `## Session end — HH:MM` to today's daily note when the session ends.
+
 Restart Claude Code.
 
 ---
