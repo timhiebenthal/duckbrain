@@ -35,8 +35,40 @@ export const DuckBrainSessionInit = async (ctx) => {
     const todayContent = await readDaily(todayStr);
     const yesterdayContent = await readDaily(yesterdayStr);
 
-    // ── Vault overview (model calls vault_info() once, then uses tag knowledge) ──
-    const vaultOverview = "\n### Vault usage\nCall vault_info() to see what topics the vault covers. Then for each query: if topic matches vault → vault_context()/vault_search(). If unrelated → skip vault.";
+    // ── Scan wiki directories for tags via Bun native fs ──
+    let vaultOverview = "";
+    try {
+      const { readdirSync, readFileSync } = await import("fs");
+      const tagSet = new Set();
+      const wikiDirs = ["entities", "concepts", "sources", "synthesis"];
+      for (const dir of wikiDirs) {
+        const dirPath = `${vaultPath}/wiki/${dir}`;
+        let files;
+        try { files = readdirSync(dirPath); } catch { continue; }
+        for (const file of files) {
+          if (!file.endsWith(".md")) continue;
+          try {
+            const text = readFileSync(`${dirPath}/${file}`, "utf-8");
+            const m = text.match(/^---\n([\s\S]*?)\n---/);
+            if (m) {
+              const fm = m[1];
+              const tagLine = fm.match(/^tags:\s*\[(.+)\]/m);
+              if (tagLine) {
+                for (const tag of tagLine[1].split(",")) {
+                  const cleaned = tag.trim().replace(/^["']+|["']+$/g, "");
+                  if (cleaned) tagSet.add(cleaned);
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+      if (tagSet.size > 0) {
+        vaultOverview = `\n### Vault topics (${tagSet.size} tags)\n${[...tagSet].sort().join(", ")}\n\nIf query matches these → vault. If unrelated → skip.`;
+      }
+    } catch {
+      vaultOverview = "\n### Vault usage\nCall vault_info() to see what topics the vault covers. Skip vault for unrelated queries.";
+    }
 
     return [
       "IMPORTANT: After analyzing code, debugging, running tests, or making architecture decisions — call vault_write(kind=\"daily\", title=\"" + todayStr + "\", content=\"## HH:MM — What was done\\n\\n...\") to save learnings to today's daily note. Do this BEFORE continuing your response.",
