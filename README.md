@@ -4,392 +4,353 @@
   <img src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/logo_writing_white_bg.png" alt="DuckBrain" width="500" />
 </p>
 
-DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents structured read and write access to your personal wiki — with full-text search, frontmatter-aware indexing, and automatic index/log updates. Built on the principle that your vault filesystem should be the single source of truth, not a database hidden behind an API.
+DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read/write access to your personal wiki — structured pages, full-text search, automatic indexing.
 
-## What it solves
+## Installation
 
-Existing agent memory tools (MemSearch, Open Brain, Mem0, Supermemory) treat memory as unstructured text blobs. If you maintain a [Karpathy-style LLM wiki](https://x.com/karpathy/status/1889054630119760374) in Obsidian with typed pages (entities, concepts, sources, synthesis), YAML frontmatter, tags, and wikilinks — none of those tools understand your vault's structure.
+Pick your agent:
 
-DuckBrain fills that gap. It reads your vault as-is and writes new pages following your vault's schema, so your wiki stays a single source of truth on the filesystem.
+- [OpenCode](#opencode) — MCP server + session plugin (recommended)
+- [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
+- [Cursor](#cursor) — MCP server + rules + hooks
+- [Hermes](#hermes) — MCP server + AGENTS.md
 
-## How it works (Architecture)
+---
 
-```
-┌──────────────────┐     MCP stdio     ┌─────────────────────────────────┐
-│    AI Agent      │ ◄──────────────►  │      DuckBrain MCP Server       │
-│                  │                   │                                 │
-│  Claude Code     │                   │  vault_info  ──┐                │
-│  OpenCode        │                   │  vault_search ─┤  DuckDB FTS    │
-│  Cursor          │                   │  vault_read  ──┤  Filesystem    │
-│  Hermes          │                   │  vault_write ──┘  Filesystem    │
-└──────────────────┘                   └────────┬────────┬───────────────┘
-                                                │        │
-                    query ┌─────────────────────┘        └── read/write ──┐
-             (full index) ▼                                               ▼  (single file)
-         ┌──────────────────────┐                              ┌───────────────────────────┐
-         │  DuckDB (in-memory)  │                              │    Your Obsidian Vault    │
-         │                      │                              │                           │
-         │  pages (in-memory    │    rebuilt from scratch      │  wiki/entities/           │
-         │  rebuilt every search)│    on every query           │  wiki/concepts/           │
-         │  ┌───────────────┐   │                              │  wiki/sources/            │
-         │  │ filepath      │   │                              │  wiki/synthesis/          │
-         │  │ title         │   │                              │  daily/                   │
-         │  │ kind          │   │                              │  wiki/index.md            │
-         │  │ tags          │   │                              │  wiki/log.md              │
-         │  │ body          │   │                              │                           │
-         │  │ created       │   │                              │  plain markdown on disk   │
-         │  │ updated       │   │                              │                           │
-         │  └───────────────┘   │                              │                           │
-         │                      │                              │                           │
-         │  BM25 search query:  │                              │                           │
-         │  SELECT ...          │                              │                           │
-         │  FROM pages p        │                              │                           │
-         │  WHERE fts_match_bm25│                              │                           │
-         │    (p.filepath,      │                              │                           │
-         │     'segfault')      │                              │                           │
-         │  AND kind='concept'  │                              │                           │
-         │  ORDER BY score DESC │                              │                           │
-         └──────────────────────┘                              └───────────────────────────┘
-```
+### OpenCode
 
-- **Reads** your vault files directly — no index to sync, no watchers, no duplicate storage
-- **Searches** via DuckDB full-text search (BM25 ranking), rebuilt fresh from disk on every query
-- **Writes** new pages with correct YAML frontmatter, auto-updating your index and log
-
-## Requirements
-
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/) (package manager)
-- An Obsidian vault structured with a `wiki/` directory containing:
-  - `wiki/entities/` — people, orgs, products, tools
-  - `wiki/concepts/` — ideas, frameworks, theories
-  - `wiki/sources/` — one summary per ingested source
-  - `wiki/synthesis/` — cross-cutting analysis
-  - `wiki/index.md` — page catalog with `## Entities`, `## Concepts`, `## Sources`, `## Synthesis` sections
-  - `wiki/log.md` — append-only chronological record
-- Pages should use YAML frontmatter: `title`, `item-type`, `tags`, `created`, `updated`
-
-This follows the schema defined for [LLM wikis](https://x.com/karpathy/status/1889054630119760374). If your vault uses a different structure, DuckBrain works with it — but index/log updates expect the section headers above.
-
-## Quick Start
+**Best experience** — session plugin gives the AI automatic vault awareness.
 
 ```bash
 pip install duckbrain
 ```
 
-That's it. Now connect your AI agent (see below) — you don't run DuckBrain yourself, the agent spawns it as needed.
-
-*(Optional: verify the install by running `duckbrain` — it'll fail with "VAULT_PATH not set", which confirms it's working.)*
-
-### Installing from source (for contributors)
-
-```bash
-git clone https://github.com/timhiebenthal/duckbrain.git
-cd duckbrain
-uv sync         # installs project + dev dependencies in a virtual environment
-```
-
-This requires [uv](https://docs.astral.sh/uv/) (the Python package manager used for development). End users should use `pip install duckbrain` above.
-
-*(Optional: to verify the install, run `VAULT_PATH="/path/to/your/vault" uv run duckbrain`. It will appear to hang — that's correct, it's waiting on stdio. Press Ctrl+C to stop.)*
-
-## Connecting to Agents
-
-MCP stdio transport means the agent spawns DuckBrain as a child process when it starts. You don't need a separate terminal or a running server. Just add this to your MCP config:
+Add to `opencode.json`:
 
 ```json
 {
-  "duckbrain": {
-    "command": "uv",
-    "args": ["run", "duckbrain"],
-    "env": {
-      "VAULT_PATH": "/path/to/your/obsidian/vault"
+  "mcp": {
+    "duckbrain": {
+      "command": "uv",
+      "args": ["run", "duckbrain"],
+      "env": { "VAULT_PATH": "/path/to/your/vault" }
     }
   }
 }
 ```
 
-Where to put it:
+Download the session plugin (no repo clone needed):
 
-| Agent | Config file | Top-level key |
-|-------|-------------|---------------|
-| Claude Code | `~/.claude/claude_desktop_config.json` or `.mcp.json` | `mcpServers` |
-| OpenCode | `opencode.json` | `mcp` |
-| Cursor | `.cursor/mcp.json` | `mcpServers` |
-| Hermes Agent | `mcp.json` | `mcpServers` |
+```bash
+mkdir -p ~/.config/opencode/plugins/
+curl -o ~/.config/opencode/plugins/vault-context.ts \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/opencode/plugins/vault-context.ts
+```
 
-Example for Claude Code:
+The plugin makes the AI aware of your vault topics and recent daily notes automatically — no manual tool calls needed. It also adds a learnings ritual and journaling rule so the AI saves session progress on its own.
+
+Restart OpenCode.
+
+---
+
+### Claude Code
+
+```bash
+pip install duckbrain
+```
+
+Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
+
 ```json
 {
   "mcpServers": {
     "duckbrain": {
       "command": "uv",
       "args": ["run", "duckbrain"],
-      "env": {
-        "VAULT_PATH": "/path/to/your/obsidian/vault"
-      }
+      "env": { "VAULT_PATH": "/path/to/your/vault" }
     }
   }
 }
 ```
 
-> **Tip:** Instead of hardcoding the path in every config, set `VAULT_PATH` once in your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`) and reference it in the config with your agent's env-var syntax:
->
-> - OpenCode: `"VAULT_PATH": "{env:VAULT_PATH}"`
-> - Claude Code: `"VAULT_PATH": "${env:VAULT_PATH}"`
+#### CLAUDE.md
 
-Make sure `uv` is on your `PATH`.
-
-### Auto-Writing Session Learnings
-
-There are two ways to make your agent write learnings to the vault: instructions (works everywhere) or hooks (automatic, agent-native).
-
-#### Approach 1: Instructions (all agents)
-
-Add this to the appropriate instructions file. The agent reads it on startup and follows it during the session. **Tested with OpenCode.**
-
-**Claude Code** — add to `CLAUDE.md`:
+Add to `.claude/CLAUDE.md`:
 
 ```markdown
-## Session Learnings
+# DuckBrain vault
 
-After debugging, diving into rabbit holes, or completing significant work,
-save what you learned so you don't repeat mistakes:
-
-- Use vault_write(kind="daily", title="...", content="...", tags=["..."])
-  to append to today's daily note.
-- For reusable knowledge, use vault_write(kind="concept", title="...",
-  content="...", tags=["..."]) to create a wiki page.
+Call vault_info() at session start to discover vault topics.
+Use vault_search() or vault_read() when the query matches vault content.
+Use vault_context() to load daily notes and search in one call.
+After non-trivial work, save learnings with vault_write().
 ```
 
-**OpenCode** — copy the templates from this repo's [`opencode/`](opencode/) directory:
+#### SessionStart hook (optional — auto-context)
+
+> **Prototype** — based on Claude Code docs, not yet validated end-to-end. Scripts work, but hook → injection pipeline needs manual verification.
+
+For automatic vault awareness without manual tool calls, add a SessionStart hook.
+Download the script (no repo clone needed):
 
 ```bash
-cp opencode/LEARNINGS.md ~/.config/opencode/LEARNINGS.md
-cp opencode/commands/journal.md ~/.config/opencode/commands/journal.md
+mkdir -p ~/.claude/hooks/
+curl -o ~/.claude/hooks/vault-context.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/claude-vault-context.sh
+chmod +x ~/.claude/hooks/vault-context.sh
 ```
 
-Then wire the instruction file into your `opencode.json`:
+Add to the same `.claude/settings.json`:
 
 ```json
-"instructions": ["/home/your-user/.config/opencode/LEARNINGS.md"]
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/full/path/to/.claude/hooks/vault-context.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-The `opencode/` directory includes:
-- **`LEARNINGS.md`** — pre-response learning guard, trigger table, session rituals, daily note template
-- **`commands/journal.md`** — `/journal` slash command to dump session progress + learnings
-- **`opencode.example.json`** — full config template with DuckBrain MCP wiring
+The hook injects vault tags and recent daily notes into Claude's context at session start — no manual `vault_info()` needed.
 
-See [`opencode/README.md`](opencode/README.md) for detailed setup instructions.
+#### SessionEnd hook (optional — auto-journal)
 
-**Cursor** — add to `.cursorrules`:
+Auto-stamp session end in today's daily note:
 
-```markdown
-## Session Learnings
-
-After debugging or completing work, save learnings via DuckBrain:
-- vault_write(kind="daily", title="<summary>", content="<details>", tags=[])
-- Use kind="concept" for reusable knowledge.
+```bash
+curl -o ~/.claude/hooks/vault-journal.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/claude-vault-journal.sh
+chmod +x ~/.claude/hooks/vault-journal.sh
 ```
 
-#### Approach 2: Hooks (automatic, no prompt engineering needed)
-
-Hooks run shell commands at specific lifecycle points — no instructions needed, they fire deterministically. **⚠️ Not tested with DuckBrain yet.**
-
-**Claude Code** — supports a full [hooks system](https://code.claude.com/docs/en/hooks) including `SessionEnd` (fires when a session terminates). Add to `.claude/settings.json`:
+Add to `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "SessionEnd": [
       {
-        "type": "command",
-        "command": "duckbrain-save-session --transcript-from-stdin"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/full/path/to/.claude/hooks/vault-journal.sh"
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-The `SessionEnd` hook receives the full transcript on stdin. A wrapper script could pipe it through an LLM to extract learnings, then call `vault_write`. See [`agent-memory-mcp`](https://github.com/ipiton/agent-memory-mcp) for a production example of this pattern.
+Appends `## Session end — HH:MM` to today's daily note when the session ends.
 
-**Cursor** — supports [hooks](https://cursor.com/docs/hooks.md) including `sessionEnd`, `postToolUse`, and `stop` via `.cursor/hooks.json`. However, `sessionEnd` is **not available in cloud agents** (local IDE only), and MCP execution hooks (`beforeMCPExecution`/`afterMCPExecution`) are **not yet wired for cloud agents**. Usable for local development, not for cloud-based Cursor sessions.
+Restart Claude Code.
 
-**.cursor/hooks.json** (local IDE only):
+---
+
+### Cursor
+
+```bash
+pip install duckbrain
+```
+
+Add to `.cursor/mcp.json`:
+
 ```json
 {
+  "mcpServers": {
+    "duckbrain": {
+      "command": "uv",
+      "args": ["run", "duckbrain"],
+      "env": { "VAULT_PATH": "/path/to/your/vault" }
+    }
+  }
+}
+```
+
+Optionally add `.cursor/rules/duckbrain.mdc` with `alwaysApply: true`:
+
+```yaml
+---
+description: DuckBrain vault knowledge base integration
+alwaysApply: true
+---
+# DuckBrain vault
+Call vault_info() at session start to discover vault topics.
+Use vault_search() when the query matches vault content.
+```
+
+#### SessionStart hook (prototype — context injection)
+
+> **Prototype** — Cursor's `additional_context` from `sessionStart` hooks has a confirmed bug (dropped due to timing). The `env` output works, but context injection does not yet. Track: [Cursor forum](https://forum.cursor.com/t/sessionstart-hook-additional-context-is-never-injected-into-agents-initial-system-context/158452)
+
+```bash
+mkdir -p ~/.cursor/hooks/
+curl -o ~/.cursor/hooks/vault-context.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/cursor-vault-context.sh
+chmod +x ~/.cursor/hooks/vault-context.sh
+```
+
+Add to `~/.cursor/hooks.json`:
+
+```json
+{
+  "version": 1,
   "hooks": {
-    "stop": [
-      {
-        "type": "command",
-        "command": "duckbrain-save-session --reason stop"
-      }
+    "sessionStart": [
+      { "command": "/full/path/to/.cursor/hooks/vault-context.sh" }
     ]
   }
 }
 ```
 
-### How It Works
+#### SessionEnd hook (auto-journal)
 
-During a session, the agent encounters a problem, debugs it, and resolves it:
-
-```
-> vault_search("duckbrain daily write")
-> vault_read(filepath="wiki/...")
-
-Agent debugs, fixes, learns something...
-
-> vault_write(
-    kind="daily",
-    title="vault_write daily kind doesn't support filepath-based reads",
-    content="When vault_search returns filepaths, the agent may try to Read files
-    directly. vault_read should accept filepath as well as title to close this gap.",
-    tags=["duckbrain", "debugging", "learned"]
-  )
+```bash
+curl -o ~/.cursor/hooks/vault-journal.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/cursor-vault-journal.sh
+chmod +x ~/.cursor/hooks/vault-journal.sh
 ```
 
-The learning is now in `daily/2026-05-28.md`. Tomorrow when you ask "how do I read vault pages by path?", the agent searches the vault, finds your note, and recalls the solution.
+Add to `~/.cursor/hooks.json`:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionEnd": [
+      { "command": "/full/path/to/.cursor/hooks/vault-journal.sh" }
+    ]
+  }
+}
+```
+
+Appends `## Session end — HH:MM` to today's daily note when a session ends.
+
+Restart Cursor.
+
+---
+
+### Hermes
+
+Add to `mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "duckbrain": {
+      "command": "uv",
+      "args": ["run", "duckbrain"],
+      "env": { "VAULT_PATH": "/path/to/your/vault" }
+    }
+  }
+}
+```
+
+Add to `AGENTS.md`:
+
+```markdown
+# DuckBrain vault
+Call vault_info() at session start to discover vault topics.
+Use vault_search() when the query matches vault content.
+After non-trivial work, save learnings with vault_write().
+```
+
+Restart Hermes.
+
+---
 
 ## Tools
 
-### `vault_info`
+| Tool | What it does |
+|------|-------------|
+| `vault_search` | Full-text search over vault pages |
+| `vault_read` | Read a page by title or filepath |
+| `vault_write` | Create a page or append to today's daily note |
+| `vault_context` | Load daily notes + keyword search in one call |
+| `vault_info` | Vault stats: page counts, tags, last modified |
 
-Get a summary of your vault's structure.
+---
 
-```
-> vault_info()
-→ {
-    entities: 38,
-    concepts: 38,
-    sources: 33,
-    synthesis: 9,
-    available_tags: ["agent-memory", "ai", "duckdb", "mcp", ...],
-    last_modified: "2026-05-28"
-  }
-```
-
-No parameters. Useful for agents to discover what's in the vault before searching.
-
-### `vault_search`
-
-Full-text search over all wiki pages.
+## Vault Schema
 
 ```
-> vault_search("agent memory", kind="concept")
-→ [
-    { title: "Agent Memory Systems", kind: "concept",
-      filepath: "wiki/concepts/agent-memory-systems.md",
-      snippet: "A 6-level taxonomy of Claude Code memory approaches..." },
-    ...
-  ]
+your-vault/
+├── wiki/
+│   ├── entities/       # people, orgs, tools
+│   ├── concepts/       # ideas, frameworks
+│   ├── sources/        # summaries of ingested content
+│   ├── synthesis/      # cross-cutting analysis
+│   ├── index.md        # page catalog (auto-updated)
+│   ├── log.md          # write history (auto-updated)
+│   └── tags.md         # topic index (auto-updated)
+├── daily/              # daily notes (YYYY-MM-DD.md)
+└── .env                # VAULT_PATH (optional)
 ```
 
-Parameters:
-- `query` (required) — search text, BM25-ranked
-- `kind` (optional) — filter to `entity`, `concept`, `source`, `synthesis`, or `daily`
-- `tags` (optional) — filter by tag substring matches
+Pages use YAML frontmatter:
 
-### `vault_read`
-
-Read a page by title or filepath. Returns full markdown content with metadata.
-
-```
-> vault_read(title="Agent Memory Systems")
-→ {
-    title: "Agent Memory Systems", kind: "concept",
-    filepath: "wiki/concepts/agent-memory-systems.md",
-    content: "# Agent Memory Systems\n\nA 6-level taxonomy...",
-    tags: ["agent-memory", "taxonomy", "ai"],
-    created: "2026-05-28", updated: "2026-05-28"
-  }
+```yaml
+---
+title: Claude Mem
+item-type: entity
+tags: [ai, memory, mcp]
+created: 2026-05-28
+updated: 2026-05-28
+---
 ```
 
-Parameters:
-- `title` (optional) — page title to look up (case-insensitive)
-- `filepath` (optional) — relative path from vault_search results (e.g. `wiki/concepts/foo.md`)
+---
 
-Use after `vault_search` to get full page content. Pass `filepath` from search results directly.
+## Nerdy Details
 
-### `vault_write`
+Implementation internals — not needed for installation.
 
-Create a new wiki page or append to today's daily note, with automatic index and log updates.
+### Architecture
 
 ```
-> vault_write(
-    kind="concept",
-    title="DuckDB FTS Memory",
-    content="# DuckDB FTS Memory\n\nHow DuckDB serves as a memory layer...",
-    tags=["agent-memory", "duckdb"]
-  )
-→ { success: true, filepath: "wiki/concepts/duckdb-fts-memory.md" }
+┌──────────────────────────────────────────────────────────────┐
+│                      AI Agent                                │
+│  ┌──────────────────────────┐  ┌──────────────────────────┐  │
+│  │ MCP Client (stdio)       │  │ Hooks / Plugins          │  │
+│  │  vault_search,           │  │ (SessionStart, system    │  │
+│  │  vault_read, vault_write │  │  transform — inject      │  │
+│  │  vault_context, vault_info│  │  vault context into      │  │
+│  │                          │  │  system prompt)          │  │
+│  └──────────┬───────────────┘  └──────────┬───────────────┘  │
+└─────────────│──────────────────────────────│──────────────────┘
+              │ MCP stdio                    │ reads directly
+              ▼                              ▼ from vault
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│  DuckBrain MCP Server        │  │ Side channel:                │
+│  vault_info   ──► DuckDB FTS │  │  wiki/tags.md                │
+│  vault_search ──► DuckDB FTS │  │  daily/YYYY-MM-DD.md         │
+│  vault_read   ──► Filesystem │  │  wiki/log.md                 │
+│  vault_write  ──► Filesystem │  │                              │
+└──────────────┬───────────────┘  └──────────────────────────────┘
+               │ reads/writes
+               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                     Your Obsidian Vault                              │
+│  wiki/entities/  wiki/concepts/  wiki/sources/  wiki/synthesis/      │
+│  daily/          wiki/index.md   wiki/log.md    wiki/tags.md         │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-For daily notes (session learnings, debugging logs):
-```
-> vault_write(
-    kind="daily",
-    title="Debugging vault_read filepath",
-    content="When search returns filepaths, agents try to Read files directly.",
-    tags=["duckbrain", "debugging"]
-  )
-→ { success: true, filepath: "daily/2026-05-28.md" }
-```
+- **Reads** vault files directly — no index to sync, no watchers, no duplicate storage
+- **Searches** via DuckDB FTS (BM25 ranking), rebuilt fresh from disk on every query
+- **Writes** new pages with YAML frontmatter, auto-updating index, log, and tags
 
-For wiki pages (entity|concept|source|synthesis), this automatically:
-1. Writes the markdown file to the correct wiki subdirectory
-2. Generates YAML frontmatter with title, item-type, tags, dates
-3. Appends an entry to `wiki/index.md` in the right section
-4. Appends a dated entry to `wiki/log.md`
-
-For daily notes, this automatically:
-1. Appends to `daily/YYYY-MM-DD.md` (creates the file if today's doesn't exist yet)
-2. No YAML frontmatter — just a `## heading` + content
-3. Does NOT update index.md (daily notes aren't wiki pages)
-4. Appends a dated entry to `wiki/log.md`
-
-Parameters:
-- `kind` (required) — `entity`, `concept`, `source`, `synthesis`, or `daily`
-- `title` (required) — page title (or section heading for daily entries)
-- `content` (required) — markdown body (without frontmatter)
-- `tags` (required) — list of tag strings
-
-## Vault Path
-
-Set via the `VAULT_PATH` environment variable (or the `env` field in your MCP config — no need for both). 
-
-For local development, copy `.env.example` to `.env` and set your path:
-
-```
-VAULT_PATH=/path/to/your/obsidian/vault
-```
-
-If you use WSL2 with your vault on Windows, set it to the WSL mount path (e.g., `/mnt/c/Users/you/Documents/obsidian/my-vault`).
-
-## Performance
-
-- FTS index rebuilt fresh from disk on every query — ~90 pages in under a second
-- Write operations complete in <500ms
-- Everything is in-memory — no persistent DuckDB database file
-- Zero network calls, zero external services
-
-## Limitations (v1)
-
-- No update or delete operations (only create)
-- No vector embeddings or semantic search
-- No page deduplication check before writing
-- ~1s per search at current scale; at 500+ pages, incremental indexing would be needed
-
-## Under Consideration
-
-Ideas we're exploring but not committing to yet — as we use the tool and understand what matters, some of these may get built. Open an issue to discuss.
-
-- **Temporal decay (recency bias)** — boost search results from recently created or updated pages. Older knowledge fades unless explicitly referenced.
-- **Vector embeddings / semantic search** — cover the ~20% recall gap that BM25 can't reach (concepts with different wording). Could integrate MemSearch or local embeddings.
-- **Update and delete operations** — allow agents to edit or remove existing pages, not just create.
-- **Incremental indexing** — INSERT single pages into the FTS index instead of full rebuild, keeping search fast at 500+ pages.
-- **Page deduplication** — detect when a page with the same title already exists before writing.
-
-## Inspirations
+### Inspirations
 
 This project stands on the shoulders of several ideas and tools:
 
@@ -398,11 +359,18 @@ This project stands on the shoulders of several ideas and tools:
 - **[Obsidian](https://obsidian.md/)** — the local-first, markdown-native note-taking tool that treats your files as the truth. DuckBrain exists because Obsidian vaults deserve tooling that respects the filesystem.
 - **[MemSearch](https://github.com/zilliztech/memsearch)** and **[Open Brain (OB1)](https://github.com/NateBJones-Projects/OB1)** — early experiments in cross-tool agent memory that demonstrated the *need* for structured vault write-back while choosing different architectures. Their strengths and gaps directly informed DuckBrain's design.
 - **[Agent Memory Systems (6-level taxonomy)](https://www.youtube.com/watch?v=UHVFcUzAGlM)** — Simon Scrapes' comprehensive comparison of Claude Code memory approaches provided the framework for understanding where DuckBrain fits in the ecosystem (Level 6: cross-tool MCP with dedicated server).
-- **[trellis-datamodel](https://github.com/timhiebenthal/trellis-datamodel)** — the same author's data modeling tool whose CI/CD patterns were borrowed for this project's repository readiness.
+- **[trellis-datamodel](https://github.com/timhiebenthal/trellis-datamodel)** — the same author's data modeling tool whose CI/CD patterns (trusted PyPI publishing, version-diff release detection, Keep a Changelog) were borrowed for this project's repository readiness.
 - **[mondayDB 3 — Solving HTAP for a Trillion-Table System](https://engineering.monday.com/mondaydb-3-solving-htap-for-a-trillion-table-system/)** — monday.com's engineering blog on their DuckDB-powered CQRS read serving layer at production scale. Proved that DuckDB in-process with per-tenant file isolation is a viable architecture — the same pattern DuckBrain applies at personal-wiki scale.
 
 The core decision — **build, don't integrate** — came from a [structured comparison](https://github.com/timhiebenthal/duckbrain/blob/main/specs/2026-05-28-duckdb-memory-mcp/spec.md) of 7 existing tools. All failed on one requirement: vault schema-aware write-back. Rather than fork or extend, DuckBrain started from first principles: what's the simplest thing that gives agents structured read/write access to an Obsidian vault? The answer was DuckDB + MCP + ~500 lines of Python.
 
-## License
+---
 
-MIT
+## Building from Source
+
+```bash
+git clone https://github.com/timhiebenthal/duckbrain.git
+cd duckbrain
+uv sync
+uv run duckbrain  # will hang waiting on stdio — that's correct
+```

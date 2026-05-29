@@ -435,3 +435,119 @@ def test_write_daily_no_index_update(temp_vault: Path) -> None:
     )
     after = index_path.read_text()
     assert before == after  # No change
+
+
+# ── build_tags_index tests ────────────────────────────────────────────────────
+
+
+def test_build_tags_index_basic(tmp_path: Path) -> None:
+    """build_tags_index extracts unique tags with counts from all wiki pages."""
+    from duckbrain.writer import build_tags_index
+
+    vault = tmp_path / "test-vault"
+    vault.mkdir()
+    (vault / "wiki").mkdir()
+
+    # Create two pages with different tags
+    (vault / "wiki" / "entities").mkdir()
+    (vault / "wiki" / "entities" / "page-a.md").write_text(
+        "---\ntitle: Page A\nitem-type: entity\ntags: [ai, memory, mcp]\n---\n\n# Page A\n"
+    )
+    (vault / "wiki" / "concepts").mkdir()
+    (vault / "wiki" / "concepts" / "page-b.md").write_text(
+        "---\ntitle: Page B\nitem-type: concept\ntags: [ai, duckdb, plugin]\n---\n\n# Page B\n"
+    )
+
+    build_tags_index(str(vault))
+
+    tags_path = vault / "wiki" / "tags.md"
+    assert tags_path.exists()
+    content = tags_path.read_text()
+    assert "ai (2)" in content
+    assert "memory (1)" in content
+    assert "duckdb (1)" in content
+
+
+def test_build_tags_index_sorted(temp_vault: Path) -> None:
+    """Tags sorted by frequency descending, then alphabetically for ties."""
+    from duckbrain.writer import build_tags_index
+
+    (temp_vault / "wiki" / "entities").mkdir(parents=True, exist_ok=True)
+    # apple appears in 3 pages, mango in 2, zebra in 1
+    (temp_vault / "wiki" / "entities" / "x.md").write_text(
+        "---\ntitle: X\nitem-type: entity\ntags: [zebra, apple, mango]\n---\n\n# X\n"
+    )
+    (temp_vault / "wiki" / "entities" / "y.md").write_text(
+        "---\ntitle: Y\nitem-type: entity\ntags: [apple, mango]\n---\n\n# Y\n"
+    )
+    (temp_vault / "wiki" / "entities" / "z.md").write_text(
+        "---\ntitle: Z\nitem-type: entity\ntags: [apple]\n---\n\n# Z\n"
+    )
+
+    build_tags_index(str(temp_vault))
+
+    content = (temp_vault / "wiki" / "tags.md").read_text()
+    # apple (3) before mango (2) before zebra (1)
+    assert content.index("apple (3)") < content.index("mango (2)") < content.index("zebra (1)")
+
+
+def test_build_tags_index_empty_vault(tmp_path: Path) -> None:
+    """Empty vault produces tags.md with no tags."""
+    from duckbrain.writer import build_tags_index
+
+    vault = tmp_path / "empty-vault"
+    vault.mkdir()
+    (vault / "wiki").mkdir()
+
+    build_tags_index(str(vault))
+
+    tags_path = vault / "wiki" / "tags.md"
+    assert tags_path.exists()
+    content = tags_path.read_text()
+    assert "No tags found" in content
+
+
+def test_build_tags_index_deduplicates(tmp_path: Path) -> None:
+    """Same tag across multiple pages appears once with correct count."""
+    from duckbrain.writer import build_tags_index
+
+    vault = tmp_path / "test-vault"
+    vault.mkdir()
+    (vault / "wiki").mkdir()
+
+    (vault / "wiki" / "entities").mkdir()
+    (vault / "wiki" / "entities" / "a.md").write_text(
+        "---\ntitle: A\nitem-type: entity\ntags: [ai, memory]\n---\n\n# A\n"
+    )
+    (vault / "wiki" / "concepts").mkdir()
+    (vault / "wiki" / "concepts" / "b.md").write_text(
+        "---\ntitle: B\nitem-type: concept\ntags: [ai, duckdb]\n---\n\n# B\n"
+    )
+
+    build_tags_index(str(vault))
+
+    content = (vault / "wiki" / "tags.md").read_text()
+    assert "ai (2)" in content
+    assert content.count("ai") == 1
+
+
+def test_write_page_updates_tags(temp_vault: Path) -> None:
+    """write_page triggers tags.md update with correct counts."""
+    from duckbrain.writer import write_page
+
+    # Create initial page
+    write_page(str(temp_vault), "entity", "Page One", "Body", ["alpha", "beta"])
+
+    tags_path = temp_vault / "wiki" / "tags.md"
+    assert tags_path.exists()
+    content = tags_path.read_text()
+    assert "alpha (1)" in content
+    assert "beta (1)" in content
+
+    # Create second page with overlapping + new tags
+    write_page(str(temp_vault), "concept", "Page Two", "Body", ["beta", "gamma"])
+
+    content = tags_path.read_text()
+    assert "alpha (1)" in content
+    assert "beta (2)" in content  # beta now appears in 2 pages
+    assert "gamma (1)" in content
