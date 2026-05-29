@@ -41,6 +41,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "altair>=6.1.0",
+    "marimo>=0.23.8",
     "mypy>=2.1.0",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
