@@ -7,8 +7,59 @@
  */
 
 export const DuckBrainSessionInit = async ({ client }) => {
+  const sessions = {};
+
+  function getSession(id) {
+    if (!sessions[id]) {
+      sessions[id] = { toolCount: 0, lastVaultSearch: 0, nudgeFiredForGap: 0 };
+    }
+    return sessions[id];
+  }
+
   return {
+    hooks: {
+      "tool.execute.after": (input, output) => {
+        const session = getSession(input.sessionID);
+        session.toolCount++;
+
+        // Track vault tool usage
+        if (input.tool === "vault_search" || input.tool === "vault_context") {
+          session.lastVaultSearch = session.toolCount;
+          return; // don't nudge on vault tools themselves
+        }
+
+        const threshold = 8;
+        const gap = session.toolCount - session.lastVaultSearch;
+
+        if (gap >= threshold && gap > session.nudgeFiredForGap) {
+          session.nudgeFiredForGap = gap;
+          const nudge = `\n\n---\n💡 Haven't searched the vault in ${gap} tool calls. Consider vault_search() or vault_context() for relevant context.`;
+          output.output = (output.output || "") + nudge;
+        }
+      },
+      "experimental.session.compacting": (input, output) => {
+        // Find the most recent vault context from any tracker
+        // For now, push a preservation reminder
+        output.context = output.context || [];
+        output.context.push(`## Vault context preservation
+
+If vault context was loaded this session (dailies, search results), include a brief summary here:
+- Today's daily note highlights
+- Any search results the agent referenced
+- Key learnings or decisions documented
+
+The goal: vault-loaded knowledge survives session compaction.`);
+      },
+    },
     event: async ({ event }) => {
+      if (event.type === "session.deleted") {
+        const sessionID = event.properties?.info?.id;
+        if (sessionID) {
+          delete sessions[sessionID];
+        }
+        return;
+      }
+
       if (event.type !== "session.created") return;
 
       try {
@@ -79,6 +130,8 @@ export const DuckBrainSessionInit = async ({ client }) => {
             parts: [{ type: "text", text: contextBlock }],
           },
         });
+
+        sessions[sessionID] = { toolCount: 0, lastVaultSearch: 0, nudgeFiredForGap: 0, dailyContext: true };
       } catch (err) {
         // Plugin must never crash the session
         console.error("[DuckBrainSessionInit] Error injecting session context:", err);
