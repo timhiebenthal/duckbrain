@@ -15,9 +15,6 @@ export const DuckBrainSessionInit = async (ctx) => {
     const vaultPath = process.env.VAULT_PATH;
     if (!vaultPath) return null;
 
-    const { readdirSync, readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
 
@@ -38,37 +35,8 @@ export const DuckBrainSessionInit = async (ctx) => {
     const todayContent = await readDaily(todayStr);
     const yesterdayContent = await readDaily(yesterdayStr);
 
-    // ── Vault tags scan via node:fs (proven working in OpenCode runtime) ──
-    let vaultOverview = "";
-    try {
-      const tagSet = new Set();
-      const wikiDirs = ["entities", "concepts", "sources", "synthesis"];
-      for (const dir of wikiDirs) {
-        const dirPath = join(vaultPath, "wiki", dir);
-        let files;
-        try { files = readdirSync(dirPath); } catch { continue; }
-        for (const file of files) {
-          if (!file.endsWith(".md")) continue;
-          try {
-            const text = readFileSync(join(dirPath, file), "utf-8");
-            for (const line of text.split("\n")) {
-              const m = line.match(/^tags:\s*\[(.+)\]$/);
-              if (m) {
-                for (const tag of m[1].split(",")) {
-                  const cleaned = tag.trim().replace(/^["']+|["']+$/g, "");
-                  if (cleaned) tagSet.add(cleaned);
-                }
-              }
-            }
-          } catch {}
-        }
-      }
-      if (tagSet.size > 0) {
-        vaultOverview = `\n### Vault topic coverage (searchable, not pre-loaded)\nThe vault wiki covers these topics: ${[...tagSet].sort().join(", ")}\n\nIf the user's question relates to any of these → vault_context() or vault_search().\nIf unrelated (e.g. cooking, cars, sports) → skip the vault entirely.`;
-      }
-    } catch {
-      vaultOverview = "\n### Vault usage\nCall vault_info() to see what topics the vault covers. Skip vault for unrelated queries.";
-    }
+    // ── Vault usage (filesystem scan blocked by OpenCode sandbox) ──
+    const vaultOverview = "\n### Vault usage\nCall vault_info() ONCE to learn vault topics. Then for each query: if topic matches → vault_context()/vault_search(). If unrelated → skip vault entirely.";
 
     return [
       "IMPORTANT: After analyzing code, debugging, running tests, or making architecture decisions — call vault_write(kind=\"daily\", title=\"" + todayStr + "\", content=\"## HH:MM — What was done\\n\\n...\") to save learnings to today's daily note. Do this BEFORE continuing your response.",
