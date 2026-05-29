@@ -311,6 +311,56 @@ updated: 2026-05-28
 
 ---
 
+## Naughty Details
+
+Implementation internals — not needed for installation.
+
+### Architecture
+
+```
+┌──────────────────┐     MCP stdio     ┌─────────────────────────────────┐
+│    AI Agent      │ ◄──────────────►  │      DuckBrain MCP Server       │
+│                  │                   │                                 │
+│  Claude Code     │                   │  vault_info  ──┐                │
+│  OpenCode        │                   │  vault_search ─┤  DuckDB FTS    │
+│  Cursor          │                   │  vault_read  ──┤  Filesystem    │
+│  Hermes          │                   │  vault_write ──┘  Filesystem    │
+└──────────────────┘                   └────────┬────────┬───────────────┘
+                                                │        │
+                    query ┌─────────────────────┘        └── read/write ──┐
+             (full index) ▼                                               ▼  (single file)
+         ┌──────────────────────┐                              ┌───────────────────────────┐
+         │  DuckDB (in-memory)  │                              │    Your Obsidian Vault    │
+         │                      │                              │                           │
+         │  pages (in-memory    │    rebuilt from scratch      │  wiki/entities/           │
+         │  rebuilt every search)│    on every query           │  wiki/concepts/           │
+         │  ┌───────────────┐   │                              │  wiki/sources/            │
+         │  │ filepath      │   │                              │  wiki/synthesis/          │
+         │  │ title         │   │                              │  daily/                   │
+         │  │ kind          │   │                              │  wiki/index.md            │
+         │  │ tags          │   │                              │  wiki/log.md              │
+         │  │ body          │   │                              │                           │
+         │  │ created       │   │                              │                           │
+         │  │ updated       │   │                              │                           │
+         │  └───────────────┘   │                              │                           │
+         │                      │                              │                           │
+         │  BM25 search query:  │                              │                           │
+         │  SELECT ...          │                              │                           │
+         │  FROM pages p        │                              │                           │
+         │  WHERE fts_match_bm25│                              │                           │
+         │    (p.filepath,      │                              │                           │
+         │     'segfault')      │                              │                           │
+         │  AND kind='concept'  │                              │                           │
+         │  ORDER BY score DESC │                              │                           │
+         └──────────────────────┘                              └───────────────────────────┘
+```
+
+- **Reads** vault files directly — no index to sync, no watchers, no duplicate storage
+- **Searches** via DuckDB FTS (BM25 ranking), rebuilt fresh from disk on every query
+- **Writes** new pages with YAML frontmatter, auto-updating index, log, and tags
+
+---
+
 ## Building from Source
 
 ```bash
