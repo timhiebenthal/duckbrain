@@ -4,12 +4,16 @@ Measures BM25 search precision, recall, MRR, and snippet quality
 against a known set of queries and ground-truth relevant pages.
 
 Usage:
-    uv run python tests/benchmarks/search_quality.py
+    uv run python tests/benchmarks/search_quality.py                    # save as baseline.json only
+    uv run python tests/benchmarks/search_quality.py --label "v0.2"    # also save labeled snapshot
 
-Saves baseline to tests/benchmarks/baseline.json.
+Labeled snapshots go to tests/benchmarks/baselines/<NNN>-<label>.json
+and persist for comparison across versions.
 """
 
+import argparse
 import json
+import re
 import statistics
 from pathlib import Path
 from typing import Any
@@ -333,7 +337,7 @@ def print_report(metrics: dict[str, Any], commit_hash: str) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
-def run_benchmark() -> dict[str, Any]:
+def run_benchmark(label: str | None = None) -> dict[str, Any]:
     """Run the benchmark and return full metrics dict."""
 
     import subprocess
@@ -359,7 +363,6 @@ def run_benchmark() -> dict[str, Any]:
         mrr = mean_reciprocal_rank(retrieved_titles, qdef["relevant"])
         sc = snippet_containment(results, qdef["query"], qdef["relevant"])
 
-        # Scores: currently not exposed in results — will always be None
         scores = [r.get("score") for r in results if r.get("score") is not None]
         score_avg = statistics.mean(scores) if scores else None
         if scores:
@@ -392,8 +395,9 @@ def run_benchmark() -> dict[str, Any]:
     ]
     avg_score = statistics.mean(score_avgs) if score_avgs else None
 
-    return {
+    metrics: dict[str, Any] = {
         "commit": commit,
+        "label": label,
         "dataset": {
             "total_pages": len(SAMPLE_PAGES),
             "total_queries": len(QUERIES),
@@ -409,15 +413,58 @@ def run_benchmark() -> dict[str, Any]:
         },
     }
 
+    if label:
+        metrics["description"] = (
+            f"Benchmark snapshot for change: {label}. "
+            f"Commit: {commit[:8]}."
+        )
+
+    return metrics
+
+
+def _next_sequence(baselines_dir: Path) -> int:
+    """Find the next available sequence number from existing snapshots."""
+    if not baselines_dir.exists():
+        return 1
+    max_n = 0
+    for path in baselines_dir.glob("*.json"):
+        m = re.match(r"^(\d+)", path.name)
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    return max_n + 1
+
+
+def _slugify(label: str) -> str:
+    """Convert a label to a filesystem-safe slug."""
+    return re.sub(r"[^a-z0-9-]+", "-", label.lower()).strip("-")
+
 
 def main() -> None:
-    metrics = run_benchmark()
+    parser = argparse.ArgumentParser(description="DuckBrain search quality benchmark")
+    parser.add_argument(
+        "--label", type=str, default=None,
+        help="Human-readable label for this snapshot (e.g. 'add-wikilink-graph')",
+    )
+    args = parser.parse_args()
+
+    label = args.label
+    metrics = run_benchmark(label=label)
     print_report(metrics, metrics["commit"])
 
-    # Save baseline
+    # Always save current baseline
     baseline_path = Path(__file__).parent / "baseline.json"
     baseline_path.write_text(json.dumps(metrics, indent=2))
     print(f"Baseline saved to {baseline_path}")
+
+    # If labeled, also save a snapshot for version comparison
+    if label:
+        baselines_dir = Path(__file__).parent / "baselines"
+        baselines_dir.mkdir(exist_ok=True)
+        seq = _next_sequence(baselines_dir)
+        snap_path = baselines_dir / f"{seq:03d}-{_slugify(label)}.json"
+        snap_path.write_text(json.dumps(metrics, indent=2))
+        print(f"Snapshot saved to {snap_path}")
+        print(f"  Label: {label}")
     print()
 
 

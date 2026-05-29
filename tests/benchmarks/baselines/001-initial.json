@@ -1,6 +1,5 @@
 {
-  "commit": "cfdcf49d077fe958ba90be96758959e8d8b257a9",
-  "label": "score-snippet-limit-v2",
+  "commit": "ea09a9a53510960213cb19630dd9e2e95f3dfa5c",
   "dataset": {
     "total_pages": 8,
     "total_queries": 8,
@@ -40,12 +39,12 @@
     },
     {
       "query": "DuckDB",
-      "relevant_count": 3,
+      "relevant_count": 4,
       "retrieved_count": 3,
       "precision_at_5": 1.0,
-      "recall_at_5": 1.0,
+      "recall_at_5": 0.75,
       "mrr": 1.0,
-      "snippet_containment": 1.0,
+      "snippet_containment": 0.75,
       "score_avg": 0.4733333333333334,
       "retrieved_titles": [
         "duckdb-memory-mcp-build-decision",
@@ -123,10 +122,11 @@
   ],
   "averages": {
     "precision_at_5": 0.8214285714285714,
-    "recall_at_5": 1.0,
+    "recall_at_5": 0.9642857142857143,
     "mrr": 1.0,
-    "snippet_containment": 0.8095238095238095,
+    "snippet_containment": 0.7738095238095238,
     "score_avg": 1.1042857142857143
   },
-  "description": "Benchmark snapshot for change: score-snippet-limit-v2. Commit: cfdcf49d."
+  "label": "Initial baseline (before improvements)",
+  "description": "BM25-only search with body[:100] snippets, no scores exposed, no result limit. Commit: 82c6f15c."
 }
