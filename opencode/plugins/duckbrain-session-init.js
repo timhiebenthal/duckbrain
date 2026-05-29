@@ -82,7 +82,7 @@ export const DuckBrainSessionInit = async ({ client }) => {
         return;
       }
 
-      const threshold = 8;
+        const threshold = 15;
       const gap = session.toolCount - session.lastVaultSearch;
 
       if (gap >= threshold && gap > session.nudgeFiredForGap) {
@@ -145,7 +145,33 @@ The goal: vault-loaded knowledge survives session compaction.`);
         const todayContent = await readDaily(todayStr);
         const yesterdayContent = await readDaily(yesterdayStr);
 
-        const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent);
+        // ── Scan vault for available tags (model uses this to decide if vault is relevant) ──
+        let vaultTagsBlock = "";
+        try {
+          const vaultFiles = new Bun.Glob("wiki/**/*.md");
+          const tagSet = new Set();
+          for await (const filepath of vaultFiles.scan({ cwd: vaultPath, absolute: true })) {
+            try {
+              const text = await Bun.file(filepath).text();
+              for (const line of text.split("\n")) {
+                const m = line.match(/^tags:\s*\[(.+)\]$/);
+                if (m) {
+                  for (const tag of m[1].split(",")) {
+                    const cleaned = tag.trim().replace(/^"+|"+$/g, "").replace(/^'+|'+$/g, "");
+                    if (cleaned) tagSet.add(cleaned);
+                  }
+                }
+              }
+            } catch {}
+          }
+          if (tagSet.size > 0) {
+            vaultTagsBlock = `\n### Vault overview\nAvailable tags (${tagSet.size}): ${[...tagSet].sort().join(", ")}\n\nTopics covered by the vault — use this to decide if vault_context() or vault_search() is worth calling.`;
+          }
+        } catch {
+          // Silent — vault scanning is a nice-to-have, not critical
+        }
+
+        const contextBlock = buildContextBlock(todayStr, yesterdayStr, todayContent, yesterdayContent) + vaultTagsBlock;
 
         // Cache context block for system.transform to inject (no client.session.prompt — that creates visible UI bloat)
         sessions[sessionID] = {
