@@ -12,7 +12,7 @@ Pick your agent:
 
 - [OpenCode](#opencode) — MCP server + session plugin (recommended)
 - [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
-- [Cursor](#cursor) — MCP server + rules
+- [Cursor](#cursor) — MCP server + rules + hooks
 - [Hermes](#hermes) — MCP server + AGENTS.md
 
 ---
@@ -87,6 +87,8 @@ After non-trivial work, save learnings with vault_write().
 ```
 
 #### SessionStart hook (optional — auto-context)
+
+> **Prototype** — based on Claude Code docs, not yet validated end-to-end. Scripts work, but hook → injection pipeline needs manual verification.
 
 For automatic vault awareness without manual tool calls, add a SessionStart hook.
 Download the script (no repo clone needed):
@@ -175,13 +177,64 @@ Add to `.cursor/mcp.json`:
 }
 ```
 
-Optionally add `.cursor/rules/duckbrain.md`:
+Optionally add `.cursor/rules/duckbrain.mdc` with `alwaysApply: true`:
 
-```markdown
+```yaml
+---
+description: DuckBrain vault knowledge base integration
+alwaysApply: true
+---
 # DuckBrain vault
 Call vault_info() at session start to discover vault topics.
 Use vault_search() when the query matches vault content.
 ```
+
+#### SessionStart hook (prototype — context injection)
+
+> **Prototype** — Cursor's `additional_context` from `sessionStart` hooks has a confirmed bug (dropped due to timing). The `env` output works, but context injection does not yet. Track: [Cursor forum](https://forum.cursor.com/t/sessionstart-hook-additional-context-is-never-injected-into-agents-initial-system-context/158452)
+
+```bash
+mkdir -p ~/.cursor/hooks/
+curl -o ~/.cursor/hooks/vault-context.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/cursor-vault-context.sh
+chmod +x ~/.cursor/hooks/vault-context.sh
+```
+
+Add to `~/.cursor/hooks.json`:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "/full/path/to/.cursor/hooks/vault-context.sh" }
+    ]
+  }
+}
+```
+
+#### SessionEnd hook (auto-journal)
+
+```bash
+curl -o ~/.cursor/hooks/vault-journal.sh \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/cursor-vault-journal.sh
+chmod +x ~/.cursor/hooks/vault-journal.sh
+```
+
+Add to `~/.cursor/hooks.json`:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionEnd": [
+      { "command": "/full/path/to/.cursor/hooks/vault-journal.sh" }
+    ]
+  }
+}
+```
+
+Appends `## Session end — HH:MM` to today's daily note when a session ends.
 
 Restart Cursor.
 
