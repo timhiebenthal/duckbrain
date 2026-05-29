@@ -47,7 +47,7 @@ def main() -> None:
     """Entry point: start MCP server on stdio."""
     vault_path = get_vault_path()
     server = FastMCP(
-        "duckbrain-vault",
+        "duckbrain",
         icons=[
             Icon(
                 src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/favicon.png",
