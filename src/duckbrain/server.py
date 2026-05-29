@@ -12,6 +12,7 @@ from duckbrain.tools.vault_info import handle_vault_info
 from duckbrain.tools.vault_read import handle_vault_read
 from duckbrain.tools.vault_search import handle_vault_search
 from duckbrain.tools.vault_write import handle_vault_write
+from duckbrain.writer import build_tags_index
 
 # Load .env from project root (or current working directory).
 load_dotenv()
@@ -44,9 +45,19 @@ def get_vault_path() -> str:
     return vault_path
 
 
+def bootstrap_vault(vault_path: str) -> None:
+    """Initialize vault state that the OpenCode plugin depends on.
+
+    Currently generates wiki/tags.md so the session plugin can
+    inject topic tags on first connection. Called once at startup.
+    """
+    build_tags_index(vault_path)
+
+
 def main() -> None:
     """Entry point: start MCP server on stdio."""
     vault_path = get_vault_path()
+    bootstrap_vault(vault_path)
     server = FastMCP(
         "duckbrain",
         icons=[

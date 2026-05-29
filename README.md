@@ -63,7 +63,7 @@ curl -o ~/.config/opencode/plugins/vault-context.ts \
 
 ### 3. Done
 
-Restart OpenCode. The AI now knows your vault contents without asking.
+Restart OpenCode. The AI loads vault tags and recent daily notes into context automatically — no manual vault_info() needed.
 
 ---
 
