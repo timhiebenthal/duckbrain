@@ -38,28 +38,10 @@ export const DuckBrainSessionInit = async (ctx) => {
 
     const todayContent = await readDaily(todayStr);
     const yesterdayContent = await readDaily(yesterdayStr);
-    process.stderr.write(`[duckbrain] loadContext: dailies loaded (today=${todayContent.length}, yesterday=${yesterdayContent.length})\n`);
+    process.stderr.write(`[duckbrain] loadContext: dailies loaded (${todayContent.length}+${yesterdayContent.length} chars)\n`);
 
-    // ── Vault index injection: read wiki/index.md directly (known path, no dir listing) ──
-    let vaultOverview = "";
-    try {
-      const { readFileSync } = await import("fs");
-      const index = readFileSync(`${vaultPath}/wiki/index.md`, "utf-8");
-      process.stderr.write(`[duckbrain] loadContext: index.md loaded (${index.length} chars)\n`);
-      // Extract section headers as topic list (lightweight, no tag scanning)
-      const sections = [];
-      for (const line of index.split("\n")) {
-        const m = line.match(/^## (.+)$/);
-        if (m) sections.push(m[1]);
-      }
-      if (sections.length > 0) {
-        vaultOverview = `\n### Vault topics\n${sections.join(", ")}\n\nIf query matches these areas → vault_context()/vault_search(). If unrelated → skip vault.`;
-        process.stderr.write(`[duckbrain] loadContext: vault topics extracted (${sections.length} sections)\n`);
-      }
-    } catch (err) {
-      process.stderr.write(`[duckbrain] loadContext: index.md read failed: ${err?.message || err}\n`);
-      vaultOverview = "\n### Vault usage\nCall vault_info() to learn vault topics, then check relevance before searching.";
-    }
+    // ── Vault usage (sandbox blocks all filesystem APIs except Bun.file) ──
+    const vaultOverview = "\n### Vault usage\nCall vault_info() to learn vault topics, then check relevance before searching.";
 
     return [
       "IMPORTANT: After analyzing code, debugging, running tests, or making architecture decisions — call vault_write(kind=\"daily\", title=\"" + todayStr + "\", content=\"## HH:MM — What was done\\n\\n...\") to save learnings to today's daily note. Do this BEFORE continuing your response.",
