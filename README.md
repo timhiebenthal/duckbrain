@@ -8,10 +8,10 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read
 
 ## Table of Contents
 
-- [OpenCode (Setup)](#opencode) — MCP + session plugin (recommended)
-- [Claude Code (Setup)](#claude-code) — MCP + CLAUDE.md
-- [Cursor (Setup)](#cursor) — MCP + rules
-- [Hermes (Setup)](#hermes) — MCP + AGENTS.md
+- [OpenCode (Installation)](#opencode) — MCP + session plugin (recommended)
+- [Claude Code (Installation)](#claude-code) — MCP + CLAUDE.md
+- [Cursor (Installation)](#cursor) — MCP + rules
+- [Hermes (Installation)](#hermes) — MCP + AGENTS.md
 - [Tools](#tools) — vault_search, vault_read, vault_write, vault_context, vault_info
 - [Vault Schema](#vault-schema) — required directory structure
 - [Installing from Source](#installing-from-source)
