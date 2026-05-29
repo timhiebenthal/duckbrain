@@ -13,7 +13,11 @@ export const DuckBrainSessionInit = async (ctx) => {
 
   async function loadContext() {
     const vaultPath = process.env.VAULT_PATH;
-    if (!vaultPath) return null;
+    if (!vaultPath) {
+      process.stderr.write("[duckbrain] loadContext: VAULT_PATH not set\n");
+      return null;
+    }
+    process.stderr.write(`[duckbrain] loadContext: VAULT_PATH=${vaultPath}\n`);
 
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
@@ -34,12 +38,14 @@ export const DuckBrainSessionInit = async (ctx) => {
 
     const todayContent = await readDaily(todayStr);
     const yesterdayContent = await readDaily(yesterdayStr);
+    process.stderr.write(`[duckbrain] loadContext: dailies loaded (today=${todayContent.length}, yesterday=${yesterdayContent.length})\n`);
 
     // ── Vault index injection: read wiki/index.md directly (known path, no dir listing) ──
     let vaultOverview = "";
     try {
       const { readFileSync } = await import("fs");
       const index = readFileSync(`${vaultPath}/wiki/index.md`, "utf-8");
+      process.stderr.write(`[duckbrain] loadContext: index.md loaded (${index.length} chars)\n`);
       // Extract section headers as topic list (lightweight, no tag scanning)
       const sections = [];
       for (const line of index.split("\n")) {
@@ -48,8 +54,10 @@ export const DuckBrainSessionInit = async (ctx) => {
       }
       if (sections.length > 0) {
         vaultOverview = `\n### Vault topics\n${sections.join(", ")}\n\nIf query matches these areas → vault_context()/vault_search(). If unrelated → skip vault.`;
+        process.stderr.write(`[duckbrain] loadContext: vault topics extracted (${sections.length} sections)\n`);
       }
-    } catch {
+    } catch (err) {
+      process.stderr.write(`[duckbrain] loadContext: index.md read failed: ${err?.message || err}\n`);
       vaultOverview = "\n### Vault usage\nCall vault_info() to learn vault topics, then check relevance before searching.";
     }
 
@@ -82,15 +90,25 @@ export const DuckBrainSessionInit = async (ctx) => {
     // ── System prompt injection (context once, journaling nudge on idle) ──
     "experimental.chat.system.transform": async (input, output) => {
       const sid = input.sessionID;
-      if (!sid) return;
+      if (!sid) {
+        process.stderr.write("[duckbrain] system.transform: no sessionID, skipping\n");
+        return;
+      }
 
       output.system = output.system || [];
 
-      // One-time context injection
       if (!injectedSessions.has(sid)) {
+        process.stderr.write(`[duckbrain] system.transform: first call for ${sid}, loading context...\n`);
         injectedSessions.add(sid);
         const contextBlock = await loadContext();
-        if (contextBlock) output.system.push(contextBlock);
+        if (contextBlock) {
+          output.system.push(contextBlock);
+          process.stderr.write(`[duckbrain] system.transform: context injected (${contextBlock.length} chars)\n`);
+        } else {
+          process.stderr.write("[duckbrain] system.transform: loadContext returned null, nothing injected\n");
+        }
+      } else {
+        process.stderr.write(`[duckbrain] system.transform: already injected for ${sid}\n`);
       }
 
       // Journaling nudge after session.idle
