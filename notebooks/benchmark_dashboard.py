@@ -11,19 +11,18 @@ app = marimo.App()
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
     import json, statistics
     from pathlib import Path
     import pandas as pd
     import altair as alt
-    return (alt, json, mo, pd, statistics, Path)
 
+    return Path, alt, json, mo, pd, statistics
 
-# ── Load data (one loop, then DataFrames handle the rest) ──
 
 @app.cell
-def __(Path, json, pd):
+def _(Path, json, pd):
     snap_dir = Path(__file__).parent.parent / "tests" / "benchmarks" / "snapshots"
 
     # Read all snapshot files into a list
@@ -81,41 +80,35 @@ def __(Path, json, pd):
 
     latest_label = snapshot_df.iloc[-1]["label"] if len(snapshot_df) > 0 else "—"
     n_snapshots = len(snapshot_df)
-    return (latest_label, n_snapshots, query_df, snapshot_df)
+    return latest_label, n_snapshots, query_df, snapshot_df
 
-
-# ── Header + metric explainer ──
 
 @app.cell
-def __(mo, n_snapshots):
+def _(mo, n_snapshots):
     mo.md("# DuckBrain Search Benchmark Dashboard")
     mo.md(f"**{n_snapshots} snapshots** loaded from `tests/benchmarks/snapshots/`")
     return
 
 
 @app.cell
-def __(mo):
-    mo.md(
-        """
-        ### What each metric measures
+def _(mo):
+    mo.md("""
+    ### What each metric measures
 
-        | Metric | Measures | Good value |
-        |---|---|---|
-        | **Snip%** (snippet containment) | Does the result snippet actually show the search term? Low = term is buried deep or only in the title, snippet shows unrelated text. | ≥90% |
-        | **P@5** (precision at 5) | Of the top 5 results, how many are actually relevant? Low = many irrelevant results in top ranks. | ≥0.80 |
-        | **R@5** (recall at 5) | Of all relevant pages, how many appear in the top 5? Low = relevant pages are being missed. | ≥0.90 |
-        | **MRR** (mean reciprocal rank) | How high is the first relevant result? 1.0 = first result always relevant. | ≥0.80 |
-        | **Score** (BM25) | DuckDB's FTS relevance score. Higher = stronger keyword match. Scores are log-scaled. | Typically 0.3–3.0 |
-        | **NDCG** | Ranks by graded relevance (not just binary). Rewards perfect ordering. Currently aspirational. | ≥0.90 |
-        """
-    )
+    | Metric | Measures | Good value |
+    |---|---|---|
+    | **Snip%** (snippet containment) | Does the result snippet actually show the search term? Low = term is buried deep or only in the title, snippet shows unrelated text. | ≥90% |
+    | **P@5** (precision at 5) | Of the top 5 results, how many are actually relevant? Low = many irrelevant results in top ranks. | ≥0.80 |
+    | **R@5** (recall at 5) | Of all relevant pages, how many appear in the top 5? Low = relevant pages are being missed. | ≥0.90 |
+    | **MRR** (mean reciprocal rank) | How high is the first relevant result? 1.0 = first result always relevant. | ≥0.80 |
+    | **Score** (BM25) | DuckDB's FTS relevance score. Higher = stronger keyword match. Scores are log-scaled. | Typically 0.3–3.0 |
+    | **NDCG** | Ranks by graded relevance (not just binary). Rewards perfect ordering. Currently aspirational. | ≥0.90 |
+    """)
     return
 
 
-# ── Summary table ──
-
 @app.cell
-def __(mo, snapshot_df):
+def _(mo, pd, snapshot_df):
     mo.md("## Snapshots")
     t = snapshot_df[
         ["label", "commit", "snip_containment", "precision_at_5", "score_avg"]
@@ -134,10 +127,8 @@ def __(mo, snapshot_df):
     return
 
 
-# ── Snippet containment over time ──
-
 @app.cell
-def __(alt, mo, snapshot_df):
+def _(alt, mo, snapshot_df):
     mo.md("### Snippet Containment — do result snippets show the matched term?")
     sc = (
         alt.Chart(snapshot_df)
@@ -155,10 +146,8 @@ def __(alt, mo, snapshot_df):
     return
 
 
-# ── P@5 over time ──
-
 @app.cell
-def __(alt, mo, snapshot_df):
+def _(alt, mo, snapshot_df):
     mo.md("### Precision@5 — fraction of top-5 results that are relevant")
     p5 = (
         alt.Chart(snapshot_df)
@@ -176,10 +165,8 @@ def __(alt, mo, snapshot_df):
     return
 
 
-# ── Per-query detail ──
-
 @app.cell
-def __(latest_label, mo, query_df):
+def _(latest_label, mo, pd, query_df):
     mo.md("## Latest Snapshot — Per-Query Detail")
     mo.md(f"**{latest_label}**  —  each row is one test query with its expected relevant pages")
 
@@ -202,16 +189,15 @@ def __(latest_label, mo, query_df):
     return
 
 
-# ── NDCG ──
-
 @app.cell
-def __():
+def _():
     import math
+
     return (math,)
 
 
 @app.cell
-def __(math):
+def _(math):
     def ndcg_score(retrieved, graded):
         if not graded:
             return 1.0
@@ -238,11 +224,11 @@ def __(math):
         "Jagged Frontier": {"Jagged Frontier": 3},
         "metrics layer": {"The missing piece of the modern data stack": 3},
     }
-    return (GRADED, ndcg_score)
+    return GRADED, ndcg_score
 
 
 @app.cell
-def __(GRADED, mo, ndcg_score, query_df, statistics):
+def _(GRADED, mo, ndcg_score, query_df, statistics):
     mo.md("---")
     mo.md("## Aspirational: NDCG@5")
     mo.md(
@@ -275,19 +261,17 @@ def __(GRADED, mo, ndcg_score, query_df, statistics):
 
 
 @app.cell
-def __(mo):
-    mo.md(
-        """
-        ## Aspirational — future metrics
+def _(mo):
+    mo.md("""
+    ## Aspirational — future metrics
 
-        **Title-aware snippets** — 81% currently. Extending `_extract_snippet()`
-        to also check page titles would close the gap to 100%.
+    **Title-aware snippets** — 81% currently. Extending `_extract_snippet()`
+    to also check page titles would close the gap to 100%.
 
-        **Wikilink navigability** — 0% currently. `[[wikilinks]]` not yet
-        extracted. Implement the wikilink graph spec to unlock backlink-based
-        navigation and ranking.
-        """
-    )
+    **Wikilink navigability** — 0% currently. `[[wikilinks]]` not yet
+    extracted. Implement the wikilink graph spec to unlock backlink-based
+    navigation and ranking.
+    """)
     return
 
 

@@ -1,9 +1,18 @@
 {
-  "commit": "ea09a9a53510960213cb19630dd9e2e95f3dfa5c",
+  "commit": "82c6f15c",
+  "label": "v0.1.0 \u2014 original baseline (BM25-only)",
+  "description": "BM25-only search: body[:100] snippets, no score exposure, no result limit. Snippet containment: 45.2%.",
   "dataset": {
     "total_pages": 8,
     "total_queries": 8,
     "queries_with_relevant": 7
+  },
+  "averages": {
+    "precision_at_5": 0.82,
+    "recall_at_5": 0.96,
+    "mrr": 1.0,
+    "snippet_containment": 0.452,
+    "score_avg": null
   },
   "per_query": [
     {
@@ -13,8 +22,8 @@
       "precision_at_5": 0.75,
       "recall_at_5": 1.0,
       "mrr": 1.0,
-      "snippet_containment": 0.6666666666666666,
-      "score_avg": 0.42500000000000004,
+      "snippet_containment": 0.667,
+      "score_avg": null,
       "retrieved_titles": [
         "Agent Memory Systems",
         "Claude Mem",
@@ -30,7 +39,7 @@
       "recall_at_5": 1.0,
       "mrr": 1.0,
       "snippet_containment": 1.0,
-      "score_avg": 0.6566666666666667,
+      "score_avg": null,
       "retrieved_titles": [
         "duckdb-memory-mcp-build-decision",
         "Claude Mem",
@@ -39,13 +48,13 @@
     },
     {
       "query": "DuckDB",
-      "relevant_count": 4,
+      "relevant_count": 3,
       "retrieved_count": 3,
       "precision_at_5": 1.0,
-      "recall_at_5": 0.75,
+      "recall_at_5": 1.0,
       "mrr": 1.0,
-      "snippet_containment": 0.75,
-      "score_avg": 0.4733333333333334,
+      "snippet_containment": 0.5,
+      "score_avg": null,
       "retrieved_titles": [
         "duckdb-memory-mcp-build-decision",
         "Agent Memory Systems",
@@ -59,8 +68,8 @@
       "precision_at_5": 0.5,
       "recall_at_5": 1.0,
       "mrr": 1.0,
-      "snippet_containment": 1.0,
-      "score_avg": 0.575,
+      "snippet_containment": 0.0,
+      "score_avg": null,
       "retrieved_titles": [
         "Knowledge Graph Architecture",
         "The LLM Wiki Concept"
@@ -73,8 +82,8 @@
       "precision_at_5": 0.5,
       "recall_at_5": 1.0,
       "mrr": 1.0,
-      "snippet_containment": 1.0,
-      "score_avg": 1.1099999999999999,
+      "snippet_containment": 0.0,
+      "score_avg": null,
       "retrieved_titles": [
         "Knowledge Graph Architecture",
         "The LLM Wiki Concept"
@@ -88,7 +97,7 @@
       "recall_at_5": 1.0,
       "mrr": 1.0,
       "snippet_containment": 0.0,
-      "score_avg": 1.98,
+      "score_avg": null,
       "retrieved_titles": [
         "Jagged Frontier"
       ]
@@ -101,32 +110,10 @@
       "recall_at_5": 1.0,
       "mrr": 1.0,
       "snippet_containment": 1.0,
-      "score_avg": 2.51,
+      "score_avg": null,
       "retrieved_titles": [
         "The missing piece of the modern data stack"
       ]
-    },
-    {
-      "query": "nonexistent_term_xyz",
-      "relevant_count": 0,
-      "retrieved_count": 1,
-      "precision_at_5": 0.0,
-      "recall_at_5": 1.0,
-      "mrr": 1.0,
-      "snippet_containment": 1.0,
-      "score_avg": 0.52,
-      "retrieved_titles": [
-        "The LLM Wiki Concept"
-      ]
     }
-  ],
-  "averages": {
-    "precision_at_5": 0.8214285714285714,
-    "recall_at_5": 0.9642857142857143,
-    "mrr": 1.0,
-    "snippet_containment": 0.7738095238095238,
-    "score_avg": 1.1042857142857143
-  },
-  "label": "Initial baseline (before improvements)",
-  "description": "BM25-only search with body[:100] snippets, no scores exposed, no result limit. Commit: 82c6f15c."
+  ]
 }

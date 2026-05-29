@@ -127,6 +127,6 @@
     "snippet_containment": 0.8095238095238095,
     "score_avg": 1.1042857142857143
   },
-  "label": "Score exposure + context-aware snippets + result limit",
+  "label": "v0.2.0 \u2014 score exposure + context-aware snippets + limit",
   "description": "Added BM25 score to results, context-aware snippet extraction via _extract_snippet(), default limit=20. Snippet containment: 45% \u2192 81%."
 }
