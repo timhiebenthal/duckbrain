@@ -437,6 +437,54 @@ def test_write_daily_no_index_update(temp_vault: Path) -> None:
     assert before == after  # No change
 
 
+def test_write_daily_dedup_merges_same_title(temp_vault: Path) -> None:
+    """Writing same title twice merges, not duplicates."""
+    from duckbrain.writer import write_page
+
+    today = date.today().isoformat()
+    write_page(str(temp_vault), "daily", "Dup test", "Version one.", ["a"])
+    write_page(str(temp_vault), "daily", "Dup test", "Version two.", ["b"])
+    filepath = temp_vault / f"daily/{today}.md"
+    content = filepath.read_text()
+    assert content.count("## Dup test") == 1, (
+        f"Expected 1 heading, got {content.count('## Dup test')}"
+    )
+    assert "Version two." in content
+    assert "Version one." not in content
+
+
+def test_write_daily_target_date_writes_past_file(temp_vault: Path) -> None:
+    """target_date writes to a specific date's file, not today."""
+    from duckbrain.writer import write_page
+
+    write_page(
+        str(temp_vault), "daily", "Past entry", "Yesterday content.", ["tag"],
+        target_date="2025-01-15",
+    )
+    filepath = temp_vault / "daily/2025-01-15.md"
+    assert filepath.exists()
+    content = filepath.read_text()
+    assert "# 2025-01-15" in content
+    assert "Past entry" in content
+    assert "Yesterday content." in content
+    today = date.today().isoformat()
+    assert not (temp_vault / f"daily/{today}.md").exists()
+
+
+def test_handle_vault_write_target_date(temp_vault: Path) -> None:
+    """handle_vault_write passes target_date through to writer."""
+    from duckbrain.tools.vault_write import handle_vault_write
+
+    result = handle_vault_write(
+        str(temp_vault), "daily", "Tool past entry", "Tool content.", ["t"],
+        target_date="2025-06-01",
+    )
+    assert result["success"] is True
+    filepath = temp_vault / "daily/2025-06-01.md"
+    assert filepath.exists()
+    assert "Tool past entry" in filepath.read_text()
+
+
 # ── build_tags_index tests ────────────────────────────────────────────────────
 
 

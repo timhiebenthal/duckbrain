@@ -108,6 +108,7 @@ def _write_daily(
     title: str,
     content: str,
     tags: list[str],
+    target_date: str | None = None,
 ) -> dict[str, Any]:
     """Append a section to today's daily note.
 
@@ -115,36 +116,57 @@ def _write_daily(
     (not under ``wiki/``).  They have no YAML frontmatter and are
     **appended** to — the file grows throughout the day.
 
+    If a section with the same ``## {title}`` heading already exists,
+    its body is replaced in-place (dedup).  Otherwise the section is
+    appended.
+
     Args:
         vault_path: Root path of the Obsidian vault.
         title: Section heading for this daily entry.
         content: Markdown body content.
         tags: List of tag strings.
+        target_date: Override target date (``YYYY-MM-DD``).  When
+            ``None`` (default), uses today's date.
 
     Returns:
         A dict with keys ``success`` (bool), ``filepath`` (str, relative),
         and ``warnings`` (list of str).
     """
     warnings: list[str] = []
-    today = date.today().isoformat()
+    today = target_date or date.today().isoformat()
     relative_path = f"daily/{today}.md"
     filepath = Path(vault_path) / relative_path
 
-    # Build the entry body
-    entry = f"\n## {title}\n\n{content}\n"
+    # Build the section body (content + tags)
+    entry_body = f"\n\n{content}\n"
     if tags:
-        entry += f"\n**Tags:** {', '.join(tags)}\n"
+        entry_body += f"\n**Tags:** {', '.join(tags)}\n"
+    heading = f"\n## {title}"
 
     # Create daily directory if needed
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    # If file doesn't exist yet, prepend a top-level date heading
     if not filepath.exists():
-        entry = f"# {today}\n{entry}"
-
-    # Append to file (always — daily notes accumulate)
-    with filepath.open("a") as f:
-        f.write(entry)
+        # New file — prepend H1 date heading + first section
+        full_entry = f"# {today}{heading}{entry_body}\n"
+        with filepath.open("a") as f:
+            f.write(full_entry)
+    else:
+        existing = filepath.read_text()
+        if heading in existing:
+            # Dedup: replace existing section body
+            start = existing.index(heading)
+            after_heading = existing[start + len(heading) :]
+            next_h2 = after_heading.find("\n## ")
+            if next_h2 == -1:
+                updated = existing[:start] + heading + entry_body + "\n"
+            else:
+                updated = existing[:start] + heading + entry_body + "\n" + after_heading[next_h2:]
+            filepath.write_text(updated)
+        else:
+            # New section: append
+            with filepath.open("a") as f:
+                f.write(f"{heading}{entry_body}\n")
 
     # Update log.md (but NOT index.md — daily pages aren't in the wiki index)
     log_path = Path(vault_path) / "wiki" / "log.md"
@@ -169,6 +191,7 @@ def write_page(
     content: str,
     tags: list[str],
     config: VaultConfig | None = None,
+    target_date: str | None = None,
 ) -> dict[str, Any]:
     """Create a new wiki page in the vault and update index/log.
 
@@ -185,17 +208,18 @@ def write_page(
         title: Page title.
         content: Markdown body content (without frontmatter).
         tags: List of tag strings.
-        config: Optional vault configuration.
+        config: Optional vault configuration for custom page kinds.
+        target_date: Override target date for daily notes (``YYYY-MM-DD``).
 
     Returns:
         A dict with keys ``success`` (bool), ``filepath`` (str, relative),
         and ``warnings`` (list of str).
     """
     if config is not None:
-        return _write_with_config(vault_path, kind, title, content, tags, config)
+        return _write_with_config(vault_path, kind, title, content, tags, config, target_date=target_date)
 
     if kind == "daily":
-        return _write_daily(vault_path, title, content, tags)
+        return _write_daily(vault_path, title, content, tags, target_date=target_date)
 
     warnings: list[str] = []
     today = date.today().isoformat()
@@ -294,10 +318,11 @@ def _write_with_config(
     content: str,
     tags: list[str],
     config: VaultConfig,
+    target_date: str | None = None,
 ) -> dict[str, Any]:
     """Write a page using configured write rules."""
     warnings: list[str] = []
-    today = date.today().isoformat()
+    today = target_date if target_date else date.today().isoformat()
     resolver = TemplateResolver()
 
     # Look up the write rule for this kind
