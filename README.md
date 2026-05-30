@@ -11,8 +11,8 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read
 Pick your agent:
 
 - [OpenCode](#opencode) — MCP server + session plugin (recommended)
-- [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
-- [Cursor](#cursor) — MCP server + rules + hooks
+- [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook **(prototype)**
+- [Cursor](#cursor) — MCP server + rules + hooks **(prototype)**
 - [Hermes](#hermes) — MCP server + AGENTS.md
 
 ---
@@ -53,7 +53,7 @@ Restart OpenCode.
 
 ---
 
-### Claude Code
+### Claude Code ⚠️ prototype
 
 ```bash
 pip install duckbrain
@@ -157,7 +157,7 @@ Restart Claude Code.
 
 ---
 
-### Cursor
+### Cursor ⚠️ prototype
 
 ```bash
 pip install duckbrain
