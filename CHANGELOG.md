@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-05-30
+
+### Fixed
+
+- **Daily note deduplication**: `_write_daily` now detects duplicate `## {title}`
+  headings and merges in-place instead of appending a second copy.
+- **`target_date` parameter**: `_write_daily`, `write_page`, and `handle_vault_write`
+  accept optional `target_date: str | None = None` to write to a specific date's
+  daily file instead of always targeting today.
+
 ## [0.3.0] - 2026-05-29
 
 ### Added
