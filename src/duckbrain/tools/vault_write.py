@@ -36,10 +36,26 @@ def handle_vault_write(
     if config is not None:
         known_kinds = {p.kind for p in config.scan_patterns}
         if kind not in known_kinds:
-            result = write_page(vault_path, kind, title, content, tags, config=config, target_date=target_date)
+            result = write_page(
+                vault_path,
+                kind,
+                title,
+                content,
+                tags,
+                config=config,
+                target_date=target_date,
+            )
             result.setdefault("warnings", []).append(
                 f"Unknown kind '{kind}' — not configured in scan patterns"
             )
             return result
 
-    return write_page(vault_path, kind, title, content, tags, config=config, target_date=target_date)
+    return write_page(
+        vault_path,
+        kind,
+        title,
+        content,
+        tags,
+        config=config,
+        target_date=target_date,
+    )

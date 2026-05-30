@@ -216,7 +216,15 @@ def write_page(
         and ``warnings`` (list of str).
     """
     if config is not None:
-        return _write_with_config(vault_path, kind, title, content, tags, config, target_date=target_date)
+        return _write_with_config(
+            vault_path,
+            kind,
+            title,
+            content,
+            tags,
+            config,
+            target_date=target_date,
+        )
 
     if kind == "daily":
         return _write_daily(vault_path, title, content, tags, target_date=target_date)
