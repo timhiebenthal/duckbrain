@@ -366,6 +366,97 @@ The core decision — **build, don't integrate** — came from a [structured com
 
 ---
 
+## Configuration
+
+DuckBrain works out of the box with standard vault layouts (entity, concept, source, synthesis, daily). If your vault has a custom structure, add a `duckbrain.config.json` file in the vault root.
+
+### Quick Start
+
+```bash
+# Copy the example config from the repo
+curl -o /path/to/your/vault/duckbrain.config.json \
+  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/duckbrain.config.example.json
+```
+
+Then edit the file to match your vault structure.
+
+### Config File Format
+
+`duckbrain.config.json` defines how DuckBrain scans and writes your vault:
+
+| Section | Purpose |
+|---------|---------|
+| `scan.patterns[]` | Where to find pages and how to extract metadata |
+| `write.rules.{kind}` | Per-kind writing behavior (directory, frontmatter, index) |
+| `write.default` | Fallback for kinds without explicit rules |
+
+#### Scan Patterns
+
+```jsonc
+{
+  "glob": "wiki/projects/*.md",   // path glob relative to vault root
+  "kind": "project",               // page kind name
+  "frontmatter": {
+    "enabled": true,               // whether files have YAML frontmatter
+    "kind_field": "item-type"      // frontmatter key that stores the kind
+  },
+  "dates": {
+    "created": "frontmatter:created",  // "frontmatter:field" | "filename" | "mtime"
+    "updated": "frontmatter:updated"
+  }
+}
+```
+
+#### Write Rules
+
+```jsonc
+{
+  "mode": "create",                  // "create" (new file) or "append" (add to existing)
+  "directory": "wiki/{kind}s/",      // directory template
+  "filename": "{slug}.md",           // filename template
+  "frontmatter": true,               // generate YAML frontmatter
+  "frontmatter_fields": {            // fields to include in frontmatter
+    "title": "{title}",
+    "item-type": "{kind}",
+    "tags": "{tags}",
+    "created": "{date}",
+    "updated": "{date}"
+  },
+  "update_log": true,                // append entry to wiki/log.md
+  "update_index": true,              // insert entry into wiki/index.md
+  "index_section": "{Kind}",         // section header name in index.md
+  "excluded_tags": ["foo"]           // tags to exclude from wiki/tags.md
+}
+```
+
+### Template Variables
+
+| Variable | Resolves to |
+|----------|-------------|
+| `{kind}` | Page kind string (e.g. `"project"`) |
+| `{Kind}` | Capitalized kind (e.g. `"Project"`) |
+| `{kinds}` | Kind with `s` appended (e.g. `"projects"`) |
+| `{slug}` | Slugified title (e.g. `"my-project"`) |
+| `{title}` | Original page title |
+| `{date}` | Today's date in ISO format (`YYYY-MM-DD`) |
+| `{tags}` | Comma-separated tag list |
+
+### No Config = Defaults
+
+If your vault doesn't have a `duckbrain.config.json`, DuckBrain uses built-in defaults that match the standard layout. Zero changes needed for most users.
+
+### Vault Audit
+
+Unsure what your vault looks like? Run `vault_audit` to see its structure:
+
+```
+vault_audit()
+```
+
+It reports directories, file counts, frontmatter patterns, date conventions, and page kinds — useful when designing a custom config.
+
+---
+
 ## Building from Source
 
 ```bash

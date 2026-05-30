@@ -5,6 +5,7 @@ from typing import Any
 import duckdb
 
 from duckbrain import PageMetadata
+from duckbrain.config import VaultConfig
 
 
 def _extract_snippet(body: str, query: str, context: int = 100) -> str:
@@ -176,16 +177,26 @@ def search(
 
 def get_stats(
     conn: duckdb.DuckDBPyConnection,
+    config: VaultConfig | None = None,
 ) -> dict[str, Any]:
     """Get statistics from the indexed pages.
+
+    When *config* is None: returns fixed hardcoded kind keys
+    (entity, concept, source, synthesis, daily) matching today's behavior.
+
+    When *config* is a :class:`VaultConfig`: returns dynamic keys
+    based on configured kinds (with 0 for kinds with no pages).
 
     Returns
     -------
     dict
-        Keys: ``entities``, ``concepts``, ``sources``, ``synthesis``,
-        ``daily``, ``available_tags``, ``last_modified``.
+        Kind count keys (dynamic or hardcoded), ``available_tags``,
+        ``last_modified``.
     """
-    # Count by kind
+    if config is not None:
+        return _get_stats_with_config(conn, config)
+
+    # Default behavior — hardcoded kinds
     kind_counts: dict[str, int] = {
         "entity": 0,
         "concept": 0,
@@ -221,3 +232,34 @@ def get_stats(
         "available_tags": sorted(all_tags),
         "last_modified": last_modified,
     }
+
+
+def _get_stats_with_config(
+    conn: duckdb.DuckDBPyConnection,
+    config: VaultConfig,
+) -> dict[str, Any]:
+    """Get stats using configured kinds."""
+    # Build a dict of all configured kinds → 0
+    kind_keys: dict[str, int] = {p.kind: 0 for p in config.scan_patterns}
+    rows = conn.execute("SELECT kind, COUNT(*) FROM pages GROUP BY kind").fetchall()
+    for kind_val, count in rows:
+        kind_keys[kind_val] = count
+
+    # Collect unique tags
+    tag_rows = conn.execute("SELECT DISTINCT tags FROM pages").fetchall()
+    all_tags: set[str] = set()
+    for (tag_str,) in tag_rows:
+        if tag_str:
+            for t in tag_str.split(","):
+                t_stripped = t.strip()
+                if t_stripped:
+                    all_tags.add(t_stripped)
+
+    row = conn.execute("SELECT MAX(updated) FROM pages").fetchone()
+    max_updated = row[0] if row else None
+    last_modified: str | None = str(max_updated) if max_updated else None
+
+    result: dict[str, Any] = dict(kind_keys)
+    result["available_tags"] = sorted(all_tags)
+    result["last_modified"] = last_modified
+    return result

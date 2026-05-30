@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Icon
 
+from duckbrain.config import VaultConfig, load_vault_config
+from duckbrain.tools.vault_audit import handle_vault_audit
 from duckbrain.tools.vault_context import handle_vault_context
 from duckbrain.tools.vault_info import handle_vault_info
 from duckbrain.tools.vault_read import handle_vault_read
@@ -45,19 +47,34 @@ def get_vault_path() -> str:
     return vault_path
 
 
+def get_vault_config(vault_path: str | None = None) -> VaultConfig:
+    """Load vault config from disk, or return defaults.
+
+    Args:
+        vault_path: Vault root path. If None, calls get_vault_path().
+
+    Returns:
+        VaultConfig from duckbrain.config.json, or defaults.
+    """
+    path = vault_path if vault_path is not None else get_vault_path()
+    return load_vault_config(path)
+
+
 def bootstrap_vault(vault_path: str) -> None:
     """Initialize vault state that the OpenCode plugin depends on.
 
-    Currently generates wiki/tags.md so the session plugin can
+    Generates wiki/tags.md so the session plugin can
     inject topic tags on first connection. Called once at startup.
     """
-    build_tags_index(vault_path)
+    config = get_vault_config(vault_path)
+    build_tags_index(vault_path, config=config)
 
 
 def main() -> None:
     """Entry point: start MCP server on stdio."""
     vault_path = get_vault_path()
     bootstrap_vault(vault_path)
+    vault_config = get_vault_config(vault_path)
     server = FastMCP(
         "duckbrain",
         icons=[
@@ -70,14 +87,20 @@ def main() -> None:
     )
 
     @server.tool()
+    def vault_audit() -> dict:
+        """Audit vault structure: detect directories, frontmatter patterns,
+        date conventions, and page kinds for config design."""
+        return handle_vault_audit(vault_path)
+
+    @server.tool()
     def vault_info() -> dict:
         """Get vault structure stats: page counts by kind, available tags, last modified date."""
-        return handle_vault_info(vault_path)
+        return handle_vault_info(vault_path, config=vault_config)
 
     @server.tool()
     def vault_read(title: str | None = None, filepath: str | None = None) -> dict:
         """Read a wiki or daily page. Pass either title or filepath (from vault_search results)."""
-        return handle_vault_read(vault_path, title=title, filepath=filepath)
+        return handle_vault_read(vault_path, title=title, filepath=filepath, config=vault_config)
 
     @server.tool()
     def vault_search(
@@ -87,7 +110,7 @@ def main() -> None:
         limit: int | None = 20,
     ) -> list[dict]:
         """Full-text search over vault wiki pages. Returns ranked results with snippets."""
-        return handle_vault_search(vault_path, query, kind, tags, limit=limit)
+        return handle_vault_search(vault_path, query, kind, tags, limit=limit, config=vault_config)
 
     @server.tool()
     def vault_write(kind: str, title: str, content: str, tags: list[str]) -> dict:
@@ -99,7 +122,7 @@ def main() -> None:
             content: Markdown body (without frontmatter)
             tags: List of tag strings
         """
-        return handle_vault_write(vault_path, kind, title, content, tags)
+        return handle_vault_write(vault_path, kind, title, content, tags, config=vault_config)
 
     @server.tool()
     def vault_context(
@@ -122,6 +145,7 @@ def main() -> None:
             include_dailies=include_dailies,
             include_search=include_search,
             search_limit=search_limit,
+            config=vault_config,
         )
 
     server.run(transport="stdio")

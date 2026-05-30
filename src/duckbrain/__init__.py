@@ -2,6 +2,14 @@
 
 from dataclasses import dataclass, field
 
+from duckbrain.config import (  # noqa: F401
+    DateSource,
+    ScanPattern,
+    VaultConfig,
+    WriteRule,
+    load_vault_config,
+)
+
 
 @dataclass
 class PageMetadata:

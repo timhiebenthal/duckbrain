@@ -1,0 +1,67 @@
+{
+  "$schema": "https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/schemas/vault-config.json",
+  "version": 1,
+  "scan": {
+    "patterns": [
+      {
+        "glob": "wiki/entities/*.md",
+        "kind": "entity",
+        "frontmatter": { "enabled": true, "kind_field": "item-type" },
+        "dates": { "created": "frontmatter:created", "updated": "frontmatter:updated" }
+      },
+      {
+        "glob": "wiki/concepts/*.md",
+        "kind": "concept",
+        "frontmatter": { "enabled": true, "kind_field": "item-type" },
+        "dates": { "created": "frontmatter:created", "updated": "frontmatter:updated" }
+      },
+      {
+        "glob": "wiki/sources/*.md",
+        "kind": "source",
+        "frontmatter": { "enabled": true, "kind_field": "item-type" },
+        "dates": { "created": "frontmatter:created", "updated": "frontmatter:updated" }
+      },
+      {
+        "glob": "wiki/synthesis/*.md",
+        "kind": "synthesis",
+        "frontmatter": { "enabled": true, "kind_field": "item-type" },
+        "dates": { "created": "frontmatter:created", "updated": "frontmatter:updated" }
+      },
+      {
+        "glob": "daily/*.md",
+        "kind": "daily",
+        "frontmatter": { "enabled": false },
+        "dates": { "created": "filename", "updated": "filename" }
+      }
+    ]
+  },
+  "write": {
+    "rules": {
+      "daily": {
+        "mode": "append",
+        "directory": "daily/",
+        "filename": "{date}.md",
+        "frontmatter": false,
+        "update_log": true,
+        "update_index": false
+      }
+    },
+    "default": {
+      "mode": "create",
+      "directory": "wiki/{kind}s/",
+      "filename": "{slug}.md",
+      "frontmatter": true,
+      "frontmatter_fields": {
+        "title": "{title}",
+        "item-type": "{kind}",
+        "tags": "{tags}",
+        "created": "{date}",
+        "updated": "{date}"
+      },
+      "update_log": true,
+      "update_index": true,
+      "index_section": "{Kind}",
+      "excluded_tags": ["source", "concept", "entity", "synthesis", "clippings"]
+    }
+  }
+}

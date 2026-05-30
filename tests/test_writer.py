@@ -551,3 +551,290 @@ def test_write_page_updates_tags(temp_vault: Path) -> None:
     assert "alpha (1)" in content
     assert "beta (2)" in content  # beta now appears in 2 pages
     assert "gamma (1)" in content
+
+
+# ── Config-driven write tests ──────────────────────────────────────────────────
+
+
+def test_write_page_with_custom_config(tmp_path: Path) -> None:
+    """write_page with config creates files in configured directories."""
+    from duckbrain.config import WriteRule, VaultConfig
+    from duckbrain.writer import write_page
+
+    vault = tmp_path / "vault"
+    wiki = vault / "wiki"
+    wiki.mkdir(parents=True)
+    (wiki / "index.md").write_text("# Index\n\n## Projects\n\n")
+    (wiki / "log.md").write_text("# Log\n\n")
+
+    config = VaultConfig(
+        write_rules={
+            "project": WriteRule(
+                mode="create",
+                directory_template="wiki/projects/",
+                filename_template="{slug}.md",
+                frontmatter=True,
+                index_section="Projects",
+            ),
+        },
+    )
+
+    result = write_page(
+        str(vault), "project", "My Project", "Project body", ["tag1"], config=config,
+    )
+
+    assert result["success"] is True
+    assert "wiki/projects/my-project.md" in result["filepath"]
+
+    # Verify file exists with correct content
+    written = (vault / "wiki" / "projects" / "my-project.md").read_text()
+    assert "---" in written  # has frontmatter
+    assert "title: My Project" in written
+    assert "item-type: project" in written
+    assert "Project body" in written
+
+    # Verify index.md updated under correct section
+    index = (wiki / "index.md").read_text()
+    assert "[[My Project]]" in index
+
+
+def test_write_page_no_config_unchanged(temp_vault: Path) -> None:
+    """write_page without config creates same files as before."""
+    from duckbrain.writer import write_page
+
+    result = write_page(str(temp_vault), "entity", "Test Entity", "Body", [])
+
+    assert result["success"] is True
+    assert "wiki/entities/test-entity.md" in result["filepath"]
+    assert (temp_vault / "wiki" / "entities" / "test-entity.md").exists()
+
+
+def test_write_page_append_mode(tmp_path: Path) -> None:
+    """write_page with mode='append' appends to existing file."""
+    from duckbrain.config import WriteRule, VaultConfig
+    from duckbrain.writer import write_page
+
+    vault = tmp_path / "vault"
+    log_dir = vault / "wiki" / "log"
+    log_dir.mkdir(parents=True)
+    (vault / "wiki" / "index.md").write_text("")
+    (vault / "wiki" / "log.md").write_text("")
+
+    today = date.today().isoformat()
+    log_file = log_dir / f"{today}.md"
+    log_file.write_text(f"# {today}\n")
+
+    config = VaultConfig(
+        write_rules={
+            "log": WriteRule(
+                mode="append",
+                directory_template="wiki/log/",
+                filename_template="{date}.md",
+                frontmatter=False,
+                update_index=False,
+                index_section=None,
+            ),
+        },
+    )
+
+    result = write_page(
+        str(vault), "log", "Entry Title", "Entry body", ["log-tag"], config=config,
+    )
+
+    assert result["success"] is True
+    content = log_file.read_text()
+    assert "Entry Title" in content
+    assert "Entry body" in content
+    assert "log-tag" in content
+
+
+# ── TemplateResolver tests ────────────────────────────────────────────────────
+
+
+def test_template_resolve_kind() -> None:
+    """{kind}, {Kind}, {kinds} resolve correctly."""
+    from duckbrain.writer import TemplateResolver
+
+    r = TemplateResolver.resolve
+    assert r("{kind}", "project", "T", []) == "project"
+    assert r("{Kind}", "project", "T", []) == "Project"
+    assert r("{kinds}", "project", "T", []) == "projects"
+
+
+def test_template_resolve_slug() -> None:
+    """{slug} and {title} resolve correctly."""
+    from duckbrain.writer import TemplateResolver
+
+    r = TemplateResolver.resolve
+    assert r("{slug}", "entity", "My Project", []) == "my-project"
+    assert r("{title}", "entity", "My Project", []) == "My Project"
+
+
+def test_template_resolve_date() -> None:
+    """{date} resolves to today's ISO date."""
+    from datetime import date
+
+    from duckbrain.writer import TemplateResolver
+
+    r = TemplateResolver.resolve
+    result = r("{date}", "x", "T", [])
+    assert result == date.today().isoformat()
+
+
+def test_template_no_substitution() -> None:
+    """String with no templates returned unchanged."""
+    from duckbrain.writer import TemplateResolver
+
+    r = TemplateResolver.resolve
+    assert r("hello world", "x", "T", []) == "hello world"
+
+
+# ── Config-driven frontmatter tests ───────────────────────────────────────────
+
+
+def test_generate_frontmatter_custom_fields(tmp_path: Path) -> None:
+    """write_page uses config frontmatter_fields when provided."""
+    from duckbrain.config import WriteRule, VaultConfig
+    from duckbrain.writer import write_page
+
+    vault = tmp_path / "vault"
+    wiki = vault / "wiki"
+    wiki.mkdir(parents=True)
+    (wiki / "index.md").write_text("")
+    (wiki / "log.md").write_text("")
+
+    config = VaultConfig(
+        write_rules={
+            "project": WriteRule(
+                mode="create",
+                directory_template="wiki/projects/",
+                filename_template="{slug}.md",
+                frontmatter=True,
+                frontmatter_fields={
+                    "title": "{title}",
+                    "status": "active",
+                },
+                update_index=False,
+                index_section=None,
+            ),
+        },
+    )
+
+    write_page(
+        str(vault), "project", "My Project", "Body", ["tag1"], config=config,
+    )
+
+    written = (vault / "wiki" / "projects" / "my-project.md").read_text()
+    assert "title: My Project" in written
+    assert "status: active" in written
+    assert "item-type" not in written  # not in custom fields
+
+
+def test_generate_frontmatter_no_frontmatter(tmp_path: Path) -> None:
+    """write_page with frontmatter=False generates no YAML block."""
+    from duckbrain.config import WriteRule, VaultConfig
+    from duckbrain.writer import write_page
+
+    vault = tmp_path / "vault"
+    wiki = vault / "wiki"
+    wiki.mkdir(parents=True)
+    (wiki / "index.md").write_text("")
+    (wiki / "log.md").write_text("")
+
+    config = VaultConfig(
+        write_rules={
+            "note": WriteRule(
+                mode="create",
+                directory_template="wiki/notes/",
+                filename_template="{slug}.md",
+                frontmatter=False,
+                update_index=False,
+                index_section=None,
+            ),
+        },
+    )
+
+    write_page(
+        str(vault), "note", "Plain Note", "No frontmatter here", [], config=config,
+    )
+
+    written = (vault / "wiki" / "notes" / "plain-note.md").read_text()
+    assert "---" not in written
+    assert written == "No frontmatter here"
+
+
+# ── Config-aware build_tags_index tests ───────────────────────────────────────
+
+
+def test_build_tags_index_with_config_scan_paths(tmp_path: Path) -> None:
+    """build_tags_index uses config scan patterns instead of hardcoded subdirs."""
+    from duckbrain.config import ScanPattern, VaultConfig
+    from duckbrain.writer import build_tags_index
+
+    vault = tmp_path / "vault"
+    projects = vault / "wiki" / "projects"
+    projects.mkdir(parents=True)
+    notes = vault / "wiki" / "notes"
+    notes.mkdir(parents=True)
+
+    (projects / "p1.md").write_text(
+        "---\ntitle: P1\ntags: [alpha, beta]\n---\n\nBody\n",
+    )
+    (notes / "n1.md").write_text(
+        "---\ntitle: N1\ntags: [gamma]\n---\n\nBody\n",
+    )
+
+    config = VaultConfig(
+        scan_patterns=[
+            ScanPattern(glob="wiki/projects/*.md", kind="project"),
+            ScanPattern(glob="wiki/notes/*.md", kind="note"),
+        ],
+    )
+
+    build_tags_index(str(vault), config=config)
+
+    tags_content = (vault / "wiki" / "tags.md").read_text()
+    assert "alpha" in tags_content
+    assert "beta" in tags_content
+    assert "gamma" in tags_content
+
+
+def test_build_tags_index_with_config_excluded_tags(tmp_path: Path) -> None:
+    """build_tags_index excludes tags specified in config."""
+    from duckbrain.config import ScanPattern, VaultConfig, WriteRule
+    from duckbrain.writer import build_tags_index
+
+    vault = tmp_path / "vault"
+    projects = vault / "wiki" / "projects"
+    projects.mkdir(parents=True)
+
+    (projects / "p1.md").write_text(
+        "---\ntitle: P1\ntags: [foo, bar, baz]\n---\n\nBody\n",
+    )
+
+    config = VaultConfig(
+        scan_patterns=[
+            ScanPattern(glob="wiki/projects/*.md", kind="project"),
+        ],
+        write_default=WriteRule(excluded_tags=["foo"]),
+    )
+
+    build_tags_index(str(vault), config=config)
+
+    tags_content = (vault / "wiki" / "tags.md").read_text()
+    assert "foo" not in tags_content
+    assert "bar" in tags_content
+    assert "baz" in tags_content
+
+
+def test_build_tags_index_no_config_unchanged(temp_vault: Path) -> None:
+    """build_tags_index without config scans same 4 dirs as today."""
+    from duckbrain.writer import build_tags_index
+
+    build_tags_index(str(temp_vault))
+
+    tags_path = temp_vault / "wiki" / "tags.md"
+    assert tags_path.exists()
+    content = tags_path.read_text()
+    # Fixture pages have tags like 'ai', 'agent-memory', 'mcp' etc.
+    assert "ai" in content

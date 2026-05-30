@@ -182,6 +182,7 @@ class VaultConfig:
     scan_patterns: list[ScanPattern]
     write_rules: dict[str, WriteRule]
     write_default: WriteRule
+    config_path: str | None  # None when using defaults (no config file found)
 
 @dataclass
 class ScanPattern:
@@ -424,6 +425,10 @@ Every new tool needs to be config-aware. Mitigation: central config object passe
 ### Risk: Scan/write misalignment
 
 If a scan pattern adds a kind like `"note"` but no matching write rule exists, it falls to `write_default` which may guess wrong (`wiki/notes/` via `{kind}s`). Mitigation: config validation at startup checks that every scanned kind has either an explicit write rule or a default that produces a reasonable path. Warning logged if not.
+
+### Risk: Scan/write field contract break
+
+ScanPattern declares how dates are extracted (e.g. `date_created: FRONTMATTER:"created"`). WriteRule declares what frontmatter fields are written (e.g. `frontmatter_fields: {"title": "{title}", "item-type": "{kind}"}`). If the writer doesn't include the fields the scanner expects, DuckBrain-written pages won't re-scan their metadata correctly. Mitigation: config option in Open Questions; in the short term, example config and docs must show consistent field sets.
 
 ### Risk: Over-generalization
 

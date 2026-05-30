@@ -7,6 +7,7 @@ from typing import Any
 
 import yaml
 
+from duckbrain.config import VaultConfig
 from duckbrain.scanner import parse_frontmatter
 
 # Map page kind to index section header name
@@ -81,6 +82,27 @@ def slugify(title: str) -> str:
     return slug
 
 
+class TemplateResolver:
+    """Resolve template strings like ``{kind}``, ``{slug}``, ``{date}``.
+
+    Supports variables: kind, Kind, kinds, slug, title, date, tags.
+    """
+
+    @staticmethod
+    def resolve(template: str, kind: str, title: str, tags: list[str]) -> str:
+        """Substitute template variables in *template*."""
+        today = date.today().isoformat()
+        slug = slugify(title)
+        result = template.replace("{kind}", kind)
+        result = result.replace("{Kind}", kind.capitalize())
+        result = result.replace("{kinds}", kind + "s")
+        result = result.replace("{slug}", slug)
+        result = result.replace("{title}", title)
+        result = result.replace("{date}", today)
+        result = result.replace("{tags}", ", ".join(tags))
+        return result
+
+
 def _write_daily(
     vault_path: str,
     title: str,
@@ -146,28 +168,32 @@ def write_page(
     title: str,
     content: str,
     tags: list[str],
+    config: VaultConfig | None = None,
 ) -> dict[str, Any]:
     """Create a new wiki page in the vault and update index/log.
 
-    Steps:
-    1. Derive slug from title → filename
-    2. Map *kind* to subdirectory under ``wiki/``
-    3. Generate full markdown with frontmatter
-    4. Write file to disk (creating subdirectories as needed)
-    5. Append log entry to ``wiki/log.md``
-    6. Insert index entry in ``wiki/index.md`` under the correct section
+    When *config* is None (default): uses hardcoded kind-to-directory
+    mappings matching DuckBrain's original layout.
+
+    When *config* is a :class:`VaultConfig`: uses configured write rules
+    for directory, frontmatter, index, and log behavior.
 
     Args:
         vault_path: Root path of the Obsidian vault.
-        kind: Page kind — ``entity``, ``concept``, ``source``, or ``synthesis``.
+        kind: Page kind — ``entity``, ``concept``, ``source``, or ``synthesis``
+            (or custom kinds when using config).
         title: Page title.
         content: Markdown body content (without frontmatter).
         tags: List of tag strings.
+        config: Optional vault configuration.
 
     Returns:
         A dict with keys ``success`` (bool), ``filepath`` (str, relative),
         and ``warnings`` (list of str).
     """
+    if config is not None:
+        return _write_with_config(vault_path, kind, title, content, tags, config)
+
     if kind == "daily":
         return _write_daily(vault_path, title, content, tags)
 
@@ -261,28 +287,170 @@ def write_page(
     }
 
 
-def build_tags_index(vault_path: str) -> None:
+def _write_with_config(
+    vault_path: str,
+    kind: str,
+    title: str,
+    content: str,
+    tags: list[str],
+    config: VaultConfig,
+) -> dict[str, Any]:
+    """Write a page using configured write rules."""
+    warnings: list[str] = []
+    today = date.today().isoformat()
+    resolver = TemplateResolver()
+
+    # Look up the write rule for this kind
+    rule = config.write_rules.get(kind)
+    if rule is None:
+        rule = config.write_default
+
+    # Resolve directory and filename
+    directory = resolver.resolve(rule.directory_template, kind, title, tags)
+    filename = resolver.resolve(rule.filename_template, kind, title, tags)
+    relative_path = f"{directory}{filename}"
+
+    filepath = Path(vault_path) / relative_path
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    if rule.mode == "append":
+        # Append mode — add content to existing file
+        entry = f"\n## {title}\n\n{content}\n"
+        if tags and rule.frontmatter is False:
+            entry += f"\n**Tags:** {', '.join(tags)}\n"
+
+        if not filepath.exists():
+            entry = f"# {today}\n{entry}"
+
+        with filepath.open("a") as f:
+            f.write(entry)
+    else:
+        # Create mode — write new file with optional frontmatter
+        if rule.frontmatter and rule.frontmatter_fields:
+            fm_dict: dict[str, Any] = {}
+            for field_name, field_template in rule.frontmatter_fields.items():
+                resolved = resolver.resolve(field_template, kind, title, tags)
+                # Tags should be a list in frontmatter, not a comma string
+                if field_name == "tags" and field_template == "{tags}":
+                    fm_dict[field_name] = tags
+                else:
+                    fm_dict[field_name] = resolved
+            fm_yaml = yaml.dump(fm_dict, default_flow_style=False, allow_unicode=True)
+            full_markdown = f"---\n{fm_yaml}---\n\n{content}"
+        else:
+            full_markdown = content
+        filepath.write_text(full_markdown)
+
+    # Update log.md
+    if rule.update_log:
+        log_path = Path(vault_path) / "wiki" / "log.md"
+        try:
+            log_format = rule.log_entry_format or (
+                "## [{date}] ingest | {title}\n- Created {kind}: {title}\n"
+            )
+            log_entry = resolver.resolve(log_format, kind, title, tags)
+            with log_path.open("a") as f:
+                f.write(log_entry)
+        except OSError as e:
+            warnings.append(f"Failed to update log.md: {e}")
+
+    # Update index.md
+    if rule.update_index and rule.index_section:
+        index_path = Path(vault_path) / "wiki" / "index.md"
+        try:
+            section_name = resolver.resolve(rule.index_section, kind, title, tags)
+            # Fall back to old KIND_TO_SECTION mapping for backward compat
+            if section_name == kind.capitalize() and kind in KIND_TO_SECTION:
+                section_name = KIND_TO_SECTION[kind]
+            section_header = f"## {section_name}"
+            index_entry = f"- [[{title}]] - {title}"
+
+            index_content = index_path.read_text()
+            lines = index_content.splitlines(keepends=True)
+
+            new_lines: list[str] = []
+            inserted = False
+            in_section = False
+
+            for i, line in enumerate(lines):
+                if line.rstrip() == section_header:
+                    in_section = True
+                    new_lines.append(line)
+                    continue
+                if in_section:
+                    if line.startswith("## ") and line.rstrip() != section_header:
+                        new_lines.append(index_entry + "\n")
+                        inserted = True
+                        in_section = False
+                    elif i == len(lines) - 1:
+                        new_lines.append(line)
+                        if not line.endswith("\n"):
+                            new_lines.append("\n")
+                        new_lines.append(index_entry + "\n")
+                        inserted = True
+                        in_section = False
+                        continue
+                new_lines.append(line)
+
+            if in_section and not inserted:
+                new_lines.append(index_entry + "\n")
+
+            if inserted or in_section:
+                index_path.write_text("".join(new_lines))
+            else:
+                warnings.append(f"Section '{section_header}' not found in index.md")
+        except OSError as e:
+            warnings.append(f"Failed to update index.md: {e}")
+
+    # Update tags.md
+    try:
+        build_tags_index(vault_path, config=config)
+    except Exception as e:
+        warnings.append(f"Failed to update tags.md: {e}")
+
+    return {
+        "success": True,
+        "filepath": relative_path,
+        "warnings": warnings,
+    }
+
+
+def build_tags_index(vault_path: str, config: VaultConfig | None = None) -> None:
     """Regenerate wiki/tags.md with all unique tags across wiki pages.
 
-    Scans all .md files under wiki/{entities,concepts,sources,synthesis}/,
-    extracts tags from YAML frontmatter, counts occurrences, sorts by
-    frequency descending, and writes to wiki/tags.md.
+    When *config* is None (default): scans hardcoded subdirectories
+    (wiki/{entities,concepts,sources,synthesis}/) with hardcoded
+    excluded tags.
 
-    Excludes structural/kind tags (source, concept, entity, synthesis,
-    clippings) that are directory metadata, not topic signals.
-
-    Output format: ``tag (N)`` where N is the number of pages with that tag.
-
-    Args:
-        vault_path: Root path of the Obsidian vault.
+    When *config* is a :class:`VaultConfig`: derives scan directories
+    from config.scan_patterns and uses per-kind or default excluded_tags.
     """
-    # Tags to exclude — structural/kind labels, not meaningful topics
-    EXCLUDED_TAGS = {"source", "concept", "entity", "synthesis", "clippings"}
+    # Determine excluded tags
+    if config is not None and config.write_default.excluded_tags is not None:
+        excluded_tags: set[str] = set(config.write_default.excluded_tags)
+    else:
+        excluded_tags = {"source", "concept", "entity", "synthesis", "clippings"}
 
     tag_counts: dict[str, int] = {}
     wiki_path = Path(vault_path) / "wiki"
 
-    for subdir in ["entities", "concepts", "sources", "synthesis"]:
+    # Determine which subdirs to scan
+    if config is not None:
+        # Derive directories from scan patterns
+        subdirs: set[str] = set()
+        for pat in config.scan_patterns:
+            # Extract the directory from the glob pattern
+            # pattern like "wiki/projects/*.md" → "wiki/projects"
+            parts = pat.glob.rsplit("/", 1)[0]  # everything before /*
+            # Remove "wiki/" prefix if present
+            if parts.startswith("wiki/"):
+                parts = parts[5:]
+            if parts:
+                subdirs.add(parts)
+    else:
+        subdirs = {"entities", "concepts", "sources", "synthesis"}
+
+    for subdir in subdirs:
         dir_path = wiki_path / subdir
         if not dir_path.is_dir():
             continue
@@ -296,7 +464,7 @@ def build_tags_index(vault_path: str) -> None:
             if isinstance(tags, list):
                 for tag in tags:
                     cleaned = str(tag).strip().strip("\"'")
-                    if cleaned and cleaned.lower() not in EXCLUDED_TAGS:
+                    if cleaned and cleaned.lower() not in excluded_tags:
                         tag_counts[cleaned] = tag_counts.get(cleaned, 0) + 1
 
     tags_path = wiki_path / "tags.md"
