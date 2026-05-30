@@ -1,11 +1,13 @@
 """Vault file discovery and YAML frontmatter parsing."""
 
+import re
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from duckbrain import PageMetadata
+from duckbrain.config import DateSource, VaultConfig
 
 
 def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
@@ -38,19 +40,25 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         return {}, content
 
 
-def scan_vault(vault_path: str) -> list[PageMetadata]:
-    """Scan an Obsidian vault for wiki pages with valid item-type frontmatter.
+def scan_vault(vault_path: str, config: VaultConfig | None = None) -> list[PageMetadata]:
+    """Scan an Obsidian vault for wiki pages.
 
-    Globs ``wiki/{entities,concepts,sources,synthesis}/*.md`` under *vault_path*
-    and returns a :class:`PageMetadata` for each file that has an ``item-type``
-    key matching the parent directory name.
+    When *config* is None (default): uses hardcoded kind-to-directory
+    mappings matching DuckBrain's original layout.
+
+    When *config* is a :class:`VaultConfig`: iterates the configured
+    scan patterns.
 
     Args:
         vault_path: Root path of the Obsidian vault.
+        config: Optional vault configuration.
 
     Returns:
         A list of :class:`PageMetadata` objects (one per discovered page).
     """
+    if config is not None:
+        return _scan_with_config(vault_path, config)
+
     vault = Path(vault_path)
     pages: list[PageMetadata] = []
 
@@ -101,6 +109,99 @@ def scan_vault(vault_path: str) -> list[PageMetadata]:
 
     pages.extend(scan_daily(vault_path))
     return pages
+
+
+def _scan_with_config(vault_path: str, config: VaultConfig) -> list[PageMetadata]:
+    """Scan vault using configured scan patterns."""
+    vault = Path(vault_path)
+    pages: list[PageMetadata] = []
+
+    for pattern in config.scan_patterns:
+        for filepath in sorted(vault.glob(pattern.glob)):
+            try:
+                content = filepath.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+
+            if pattern.frontmatter_enabled:
+                meta, body = parse_frontmatter(content)
+                # Check kind field matches expected kind
+                kind_field = pattern.kind_field or "item-type"
+                item_type = meta.get(kind_field)
+                if not item_type:
+                    continue
+                kind = str(item_type)
+                title = meta.get("title", filepath.stem)
+                tags = meta.get("tags", [])
+                tags = tags if isinstance(tags, list) else []
+                created = _extract_date(
+                    meta,
+                    filepath,
+                    pattern.date_created,
+                    pattern.created_field,
+                )
+                updated = _extract_date(
+                    meta,
+                    filepath,
+                    pattern.date_updated,
+                    pattern.updated_field,
+                )
+            else:
+                # No frontmatter — derive from filename
+                body = content
+                kind = pattern.kind
+                title = filepath.stem
+                tags = []
+                created = _extract_date(
+                    {},
+                    filepath,
+                    pattern.date_created,
+                    pattern.created_field,
+                )
+                updated = _extract_date(
+                    {},
+                    filepath,
+                    pattern.date_updated,
+                    pattern.updated_field,
+                )
+
+            pages.append(
+                PageMetadata(
+                    filepath=str(filepath.relative_to(vault)),
+                    title=title,
+                    kind=kind,
+                    tags=tags,
+                    body=body,
+                    created=created,
+                    updated=updated,
+                ),
+            )
+
+    return pages
+
+
+_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+
+
+def _extract_date(
+    meta: dict[str, Any],
+    filepath: Path,
+    source: DateSource,
+    field: str,
+) -> str:
+    """Extract date from metadata or filesystem per DateSource."""
+    if source == DateSource.FRONTMATTER:
+        val = meta.get(field, "")
+        return str(val) if val else ""
+    if source == DateSource.FILENAME:
+        m = _DATE_RE.match(filepath.stem)
+        return m.group(1) if m else ""
+    if source == DateSource.MTIME:
+        try:
+            return str(filepath.stat().st_mtime)
+        except OSError:
+            return ""
+    return ""
 
 
 def scan_daily(vault_path: str) -> list[PageMetadata]:

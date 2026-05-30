@@ -141,3 +141,129 @@ def test_scan_vault_includes_daily(temp_vault: Path) -> None:
     assert "Worked on DuckBrain MCP server." in daily.body
     assert daily.created == "2026-05-28"
     assert daily.updated == "2026-05-28"
+
+
+# ── Config-driven scan tests ──────────────────────────────────────────────────
+
+
+def test_scan_with_config_patterns(temp_vault: Path) -> None:
+    """scan_vault with custom config scans only the patterns defined in config."""
+    from duckbrain.config import ScanPattern, VaultConfig
+    from duckbrain.scanner import scan_vault
+
+    # Create a project page in a custom directory
+    projects_dir = temp_vault / "wiki" / "projects"
+    projects_dir.mkdir(parents=True)
+    project_content = """---
+title: My Project
+item-type: project
+tags: [test]
+created: 2026-01-15
+updated: 2026-01-15
+---
+
+# My Project
+
+This is a test project.
+"""
+    (projects_dir / "my-project.md").write_text(project_content)
+
+    config = VaultConfig(
+        scan_patterns=[
+            ScanPattern(
+                glob="wiki/projects/*.md",
+                kind="project",
+                kind_field="item-type",
+            ),
+        ],
+    )
+
+    pages = scan_vault(str(temp_vault), config=config)
+
+    assert len(pages) == 1
+    assert pages[0].kind == "project"
+    assert pages[0].title == "My Project"
+    assert pages[0].tags == ["test"]
+    assert "wiki/projects/my-project.md" in pages[0].filepath
+
+
+def test_scan_no_config_unchanged(temp_vault: Path) -> None:
+    """scan_vault without config returns same pages as today."""
+    from duckbrain.scanner import scan_vault
+
+    pages = scan_vault(str(temp_vault))
+
+    # temp_vault fixture creates 5 wiki pages + 1 daily note = 6 pages
+    assert len(pages) == 6
+    kinds = [p.kind for p in pages]
+    assert kinds.count("entity") == 1
+    assert kinds.count("concept") == 2
+    assert kinds.count("source") == 1
+    assert kinds.count("synthesis") == 1
+    assert kinds.count("daily") == 1
+
+
+def test_scan_date_from_filename(tmp_path: Path) -> None:
+    """Config with date_created=FILENAME extracts date from file stem."""
+    from datetime import date
+
+    from duckbrain.config import DateSource, ScanPattern, VaultConfig
+    from duckbrain.scanner import scan_vault
+
+    vault = tmp_path / "vault"
+    daily = vault / "daily"
+    daily.mkdir(parents=True)
+    (daily / "2026-01-15.md").write_text("Some daily content")
+
+    config = VaultConfig(
+        scan_patterns=[
+            ScanPattern(
+                glob="daily/*.md",
+                kind="daily",
+                frontmatter_enabled=False,
+                kind_field=None,
+                date_created=DateSource.FILENAME,
+                date_updated=DateSource.FILENAME,
+            ),
+        ],
+    )
+
+    pages = scan_vault(str(vault), config=config)
+    assert len(pages) == 1
+    assert pages[0].created == "2026-01-15"
+    assert pages[0].updated == "2026-01-15"
+
+
+def test_scan_date_from_mtime(tmp_path: Path) -> None:
+    """Config with date_created=MTIME uses filesystem modification time."""
+    import os
+    import time
+
+    from duckbrain.config import DateSource, ScanPattern, VaultConfig
+    from duckbrain.scanner import scan_vault
+
+    vault = tmp_path / "vault"
+    daily = vault / "daily"
+    daily.mkdir(parents=True)
+    fpath = daily / "some-note.md"
+    fpath.write_text("content")
+    # Set a known mtime
+    known_time = 1700000000.0  # some fixed timestamp
+    os.utime(str(fpath), (known_time, known_time))
+
+    config = VaultConfig(
+        scan_patterns=[
+            ScanPattern(
+                glob="daily/*.md",
+                kind="daily",
+                frontmatter_enabled=False,
+                kind_field=None,
+                date_created=DateSource.MTIME,
+                date_updated=DateSource.MTIME,
+            ),
+        ],
+    )
+
+    pages = scan_vault(str(vault), config=config)
+    assert len(pages) == 1
+    assert pages[0].created == str(known_time)

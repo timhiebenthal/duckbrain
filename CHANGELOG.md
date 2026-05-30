@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0b1] - 2026-05-30
+
+### Added
+
+- **Configurable vault structure** (`duckbrain.config.json`): Vault-root config file
+  that lets users declare custom page kinds, scan patterns, write rules, and
+  frontmatter conventions. DuckBrain adapts its scanner, writer, indexer and tools
+  dynamically. Backward compatible — no config file means exact same behavior as
+  before.
+- **`VaultConfig` types**: `ScanPattern`, `WriteRule`, `DateSource` dataclasses
+  with built-in defaults matching the standard vault layout.
+- **`TemplateResolver`**: Centralized `{kind}`, `{Kind}`, `{slug}`, `{date}`,
+  `{tags}` template variable substitution for configurable directory paths,
+  filenames, frontmatter fields, index sections, and log entries.
+- **`vault_audit` tool**: Diagnostic scanner that reports vault structure —
+  directories, frontmatter patterns, date conventions, page kinds — to help users
+  design their config.
+- **Config status in `vault_info`**: Reports whether config is active and which
+  kinds are configured.
+- **Backward compat regression suite** (`test_backward_compat.py`): 9 tests
+  proving old API = new API with `config=None` or `config=VaultConfig()`.
+
+### Changed
+
+- **scanner.py**: `scan_vault(vault_path, config=None)` accepts optional
+  `VaultConfig` for dynamic scan patterns and date extraction (frontmatter,
+  filename, mtime).
+- **writer.py**: `write_page(..., config=None)` accepts optional `VaultConfig`
+  for config-driven directories, frontmatter, index/log updates. `_write_daily`
+  special-case generalized to `mode="append"` in write rules.
+- **indexer.py**: `get_stats(conn, config=None)` returns dynamic kind keys when
+  config is active (singular like `entity`), plural keys when no config
+  (`entities`).
+- **server.py**: Loads config at startup via `get_vault_config()`, passes through
+  to all tools and `bootstrap_vault()`.
+- **All 5 tool handlers** accept optional `config` parameter for config-aware
+  behavior.
+
 ## [0.3.1] - 2026-05-30
 
 ### Fixed

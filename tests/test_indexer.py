@@ -316,3 +316,85 @@ def test_get_stats_empty() -> None:
     assert stats["available_tags"] == []
     assert stats["last_modified"] is None
     conn.close()
+
+
+# ── Config-aware stats tests ─────────────────────────────────────────────────
+
+
+def test_get_stats_with_config(sample_pages: list[PageMetadata]) -> None:
+    """get_stats with config returns keys matching configured kinds."""
+    from duckbrain.config import VaultConfig
+    from duckbrain.indexer import build_fts_index, get_stats
+
+    conn = build_fts_index(sample_pages)
+    config = VaultConfig()  # default config: entity, concept, source, synthesis, daily
+    stats = get_stats(conn, config=config)
+
+    assert stats["entity"] > 0
+    assert stats["concept"] > 0
+    assert stats["source"] > 0
+    assert stats["synthesis"] > 0
+    assert stats["daily"] > 0
+    assert "available_tags" in stats
+    assert "last_modified" in stats
+
+
+def test_get_stats_no_config_unchanged(sample_pages: list[PageMetadata]) -> None:
+    """get_stats without config returns same plural kind keys as today."""
+    from duckbrain.indexer import build_fts_index, get_stats
+
+    conn = build_fts_index(sample_pages)
+    stats = get_stats(conn)
+
+    # Old hardcoded keys use plural forms
+    assert "entities" in stats
+    assert "concepts" in stats
+    assert "sources" in stats
+    assert "synthesis" in stats
+    assert "daily" in stats
+    assert "available_tags" in stats
+    assert "last_modified" in stats
+
+
+def test_get_stats_dynamic_keys() -> None:
+    """get_stats with custom config returns only configured kind keys."""
+    from duckbrain.config import ScanPattern, VaultConfig
+    from duckbrain.indexer import build_fts_index, get_stats
+
+    pages = [
+        PageMetadata(
+            filepath="wiki/projects/p1.md",
+            title="P1",
+            kind="project",
+            tags=["a"],
+            body="body",
+            created="2026-01-01",
+            updated="2026-01-01",
+        ),
+        PageMetadata(
+            filepath="wiki/notes/n1.md",
+            title="N1",
+            kind="note",
+            tags=["b"],
+            body="body",
+            created="2026-01-01",
+            updated="2026-01-01",
+        ),
+    ]
+
+    config = VaultConfig(
+        scan_patterns=[
+            ScanPattern(glob="wiki/projects/*.md", kind="project"),
+            ScanPattern(glob="wiki/notes/*.md", kind="note"),
+        ],
+    )
+
+    conn = build_fts_index(pages)
+    stats = get_stats(conn, config=config)
+
+    assert stats["project"] == 1
+    assert stats["note"] == 1
+    assert "entity" not in stats  # not in config kinds
+    assert "available_tags" in stats
+    assert "last_modified" in stats
+    conn.close()
