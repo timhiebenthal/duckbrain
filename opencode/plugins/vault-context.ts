@@ -6,10 +6,9 @@
  *
  * Requires:   VAULT_PATH env var pointing to your Obsidian vault root
  *
- * Architecture: Tiered injection + guard + compaction preservation
+ * Architecture: Tiered injection + compaction preservation
  *   - Tags: always injected (small ~2K, routing signal)
  *   - Log + dailies: first call only (expensive, session context)
- *   - Guard: track vault-free calls, nudge via system prompt
  *   - Compaction: re-inject snapshot + journal nudge
  *
  * Proven constraints (from probe):
@@ -18,18 +17,13 @@
  *   ✅  process.env / Bun.env     — works
  *   ✅  output.system.push()      — mutations reach the LLM
  *   ✅  experimental.session.compacting — fires, output.context.push() works
- *   ✅  tool.execute.after         — fires after every tool call (for counting)
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
 
 // ─── tunables ────────────────────────────────────────────────────────────────
 
-const MAX_LOG_LINES      = 30   // tail of wiki/log.md
-const GUARD_THRESHOLD    = 8    // tool calls before guard nudge fires
-const VAULT_TOOL_NAMES   = [    // tools that count as "vault interaction"
-  "vault_search", "vault_read", "vault_write", "vault_info", "vault_context",
-]
+const MAX_LOG_LINES = 30 // tail of wiki/log.md
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -110,15 +104,6 @@ Format: caveman-concise. Cut filler words.`)
   return parts.join("\n\n")
 }
 
-// ─── guard state ─────────────────────────────────────────────────────────────
-
-let toolCallCount = 0
-let lastVaultToolCall = 0
-
-function isVaultTool(toolName: string): boolean {
-  return VAULT_TOOL_NAMES.some(vt => toolName.toLowerCase().includes(vt))
-}
-
 // ─── plugin export ────────────────────────────────────────────────────────────
 
 export const VaultContextPlugin: Plugin = async ({ client }) => {
@@ -163,17 +148,6 @@ Format: caveman-concise. Cut filler words. vault_search first to avoid duplicate
           `.trim())
         }
 
-        // Guard: inject nudge if threshold exceeded
-        const callsSinceVault = toolCallCount - lastVaultToolCall
-        if (callsSinceVault >= GUARD_THRESHOLD) {
-          output.system.push(`
-<vault-guard>
-⚠️ You've made ${callsSinceVault} tool calls without checking the vault.
-If the current task relates to documented topics, consider vault_search or vault_read before proceeding.
-</vault-guard>
-          `.trim())
-        }
-
         // Tier 2: Session context — first call only (or after compaction)
         if (!sessionContextInjected) {
           const context = await loadSessionContext(vaultPath)
@@ -188,20 +162,6 @@ ${context}
         }
       } catch {
         // Never crash the session over vault unavailability
-      }
-    },
-
-    // ─── Guard: count tool calls, track vault interactions ────────────────
-    "tool.execute.after": async (input, output) => {
-      try {
-        toolCallCount++
-        const toolName = input.tool?.name || ""
-
-        if (isVaultTool(toolName)) {
-          lastVaultToolCall = toolCallCount
-        }
-      } catch {
-        // Never crash the session over guard logic
       }
     },
 
