@@ -39,17 +39,25 @@ Add to `opencode.json`:
 }
 ```
 
-Download the session plugin (no repo clone needed):
+Download the session plugin (you need [bun](https://bun.sh) for the install):
 
 ```bash
 mkdir -p ~/.config/opencode/plugins/
-curl -o ~/.config/opencode/plugins/vault-context.ts \
-  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/opencode/plugins/vault-context.ts
+cd ~/.config/opencode/plugins
+
+for f in vault-context.ts vault-context-helpers.ts package.json; do
+  curl -O "https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/opencode/plugins/$f"
+done
+
+bun install
 ```
 
-The plugin makes the AI aware of your vault topics and recent daily notes automatically — no manual tool calls needed. It also adds a learnings ritual and journaling rule so the AI saves session progress on its own.
+Restart OpenCode. The plugin gives your AI automatic vault awareness and a few useful defaults:
 
-Restart OpenCode.
+- **Vault-aware context** — your AI sees your vault's topics, recent notes, and today's daily entry automatically. No need to ask "what's in my vault" or paste paths.
+- **Daily note journaling** — the AI captures session progress, decisions, and discoveries into your daily note as you work, so you don't lose context between sessions.
+- **Real local-time timestamps** — entries are timestamped with your actual local time, not whatever the AI guesses.
+- **End-of-session save** — when you finish a session, the AI is prompted to journal anything new before the conversation closes. (Window close is still a loss — use `/journal` for guaranteed save.)
 
 ---
 

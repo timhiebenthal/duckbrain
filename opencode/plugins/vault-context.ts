@@ -1,10 +1,16 @@
 /**
- * DuckBrain vault context plugin for OpenCode
+ * DuckBrain vault context plugin for OpenCode — v2.1
  *
  * Placement:  ~/.config/opencode/plugins/vault-context.ts  (global)
  *         or  .opencode/plugins/vault-context.ts            (project-local)
  *
  * Requires:   VAULT_PATH env var pointing to your Obsidian vault root
+ *
+ * Architecture: Tiered injection + compaction preservation + idle auto-save
+ *   - Tags: always injected (small ~2K, routing signal)
+ *   - Log + dailies: first call only (expensive, session context)
+ *   - Compaction: re-inject snapshot + journal nudge
+ *   - session.idle: re-prompt model to journal before session ends
  *
  * Proven constraints (from probe):
  *   ✅  Bun.file(path).text()     — works, use this for all file reads
@@ -12,89 +18,27 @@
  *   ✅  process.env / Bun.env     — works
  *   ✅  output.system.push()      — mutations reach the LLM
  *   ✅  experimental.session.compacting — fires, output.context.push() works
+ *   ✅  event hook                — fires with EventSessionIdle; client.session.prompt() works
+ *
+ * v2.1 additions (this file):
+ *   - Added `event` hook listening for `session.idle` to re-prompt the
+ *     model with a journal nudge via client.session.prompt(). Best-effort
+ *     auto-save for the "agent finished naturally" case. Fire-and-forget
+ *     by design — window-close is acceptable loss (user can run /journal
+ *     before close for guaranteed save).
+ *   - Added `idleNudgeSent` flag, reset on compaction (same pattern as
+ *     `sessionContextInjected`). Prevents recursion: one nudge per
+ *     session-segment between compactions.
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
-
-// ─── tunables ────────────────────────────────────────────────────────────────
-
-const MAX_DAILY_NOTES   = 3    // how many recent daily notes to include in full
-const MAX_LOG_LINES     = 40   // tail of wiki/log.md to show
-
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
-async function safeRead(path: string): Promise<string | null> {
-  try {
-    return await Bun.file(path).text()
-  } catch {
-    return null
-  }
-}
-
-function tail(text: string, lines: number): string {
-  return text.split("\n").slice(-lines).join("\n")
-}
-
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function recentDates(n: number): string[] {
-  const dates: string[] = []
-  const d = new Date()
-  for (let i = 0; i < n; i++) {
-    dates.push(d.toISOString().slice(0, 10))
-    d.setDate(d.getDate() - 1)
-  }
-  return dates
-}
-
-// ─── core context loader ──────────────────────────────────────────────────────
-
-async function loadVaultContext(vaultPath: string): Promise<string> {
-  const parts: string[] = []
-
-  // Vault tags — concise topic list (updated by DuckBrain on every write)
-  const tags = await safeRead(`${vaultPath}/wiki/tags.md`)
-  if (tags) {
-    parts.push(`## Vault topic tags\n${tags.trim()}`)
-  }
-
-  // Tail of wiki/log.md — most recent write activity
-  const log = await safeRead(`${vaultPath}/wiki/log.md`)
-  if (log) {
-    parts.push(`## Recent vault activity (last ${MAX_LOG_LINES} log lines)\n${tail(log, MAX_LOG_LINES)}`)
-  }
-
-  // Recent daily notes — today + yesterday + day before
-  const dailyParts: string[] = []
-  for (const date of recentDates(MAX_DAILY_NOTES)) {
-    const note = await safeRead(`${vaultPath}/daily/${date}.md`)
-    if (note) {
-      dailyParts.push(`### ${date}\n${note.trim()}`)
-    }
-  }
-  if (dailyParts.length > 0) {
-    parts.push(`## Recent daily notes\n${dailyParts.join("\n\n")}`)
-  }
-
-  return parts.join("\n\n---\n\n")
-}
-
-// ─── compaction snapshot ──────────────────────────────────────────────────────
-
-async function loadCompactionSnapshot(vaultPath: string): Promise<string> {
-  const log = await safeRead(`${vaultPath}/wiki/log.md`)
-  const today = await safeRead(`${vaultPath}/daily/${todayStr()}.md`)
-
-  const parts: string[] = [
-    "The following vault context was active at compaction time and should be preserved:",
-  ]
-  if (log)   parts.push(`### Last vault writes\n${tail(log, 20)}`)
-  if (today) parts.push(`### Today's daily note (${todayStr()})\n${today.trim()}`)
-
-  return parts.join("\n\n")
-}
+import {
+  loadTags,
+  loadSessionContext,
+  loadCompactionSnapshot,
+  buildIdleNudgePrompt,
+  todayStr,
+} from "./vault-context-helpers"
 
 // ─── plugin export ────────────────────────────────────────────────────────────
 
@@ -102,17 +46,25 @@ export const VaultContextPlugin: Plugin = async ({ client }) => {
   const vaultPath = process.env.VAULT_PATH
   if (!vaultPath) return {}
 
+  // Module-scoped flags. Safe only if OpenCode spawns one plugin
+  // process per session — verified via probe 2026-05-31 (see
+  // specs/2026-05-31-vault-interaction-robustness/spec.md). If
+  // OpenCode ever reuses a process across sessions, these leak
+  // state — switch to Map<sessionID, bool> using the sessionID
+  // from system.transform input.
+  let sessionContextInjected = false
+  let idleNudgeSent = false
+
   return {
+    // ─── Tiered system prompt injection ──────────────────────────────────
     "experimental.chat.system.transform": async (input, output) => {
       try {
-        const context = await loadVaultContext(vaultPath)
-        if (!context) return
-
-        output.system.push(`
+        // Tier 1: Always inject tags
+        const tags = await loadTags(vaultPath)
+        if (tags) {
+          output.system.push(`
 <vault-context>
-IMPORTANT: After analyzing code, debugging, running tests, or making architecture decisions — call vault_write(kind="daily", title="${todayStr()}", content="## HH:MM — What was done\\n\\n...") to save learnings to today's daily note. Do this BEFORE continuing your response.
-
-## Personal knowledge vault — topic tags
+## Vault topic tags
 
 The tags below list every topic documented in your personal Obsidian vault.
 Use them to decide how to answer before reaching for any tool:
@@ -122,11 +74,11 @@ Use them to decide how to answer before reaching for any tool:
 
 Do not call vault_info() or vault_search() speculatively. The tags below are the complete topic map.
 
-${context}
+${tags.trim()}
 
 ## Vault learnings ritual
 
-Save learnings via vault_write(kind="daily", title="YYYY-MM-DD", content="## HH:MM — Summary\\n\\n..."):
+Save learnings via vault_write(kind="daily", title="${todayStr()}", content="## Topic\\n\\nDetails"):
 - After completing a task or fixing a bug
 - After finding root cause of a bug
 - After a discovery during investigation
@@ -134,20 +86,100 @@ Save learnings via vault_write(kind="daily", title="YYYY-MM-DD", content="## HH:
 - After an architecture decision
 - At end of session (/journal)
 
+The server prepends HH:MM — to the section heading automatically — you don't
+need to add a timestamp. The model just writes the content; writer.py stamps it.
+This is a server-side guarantee, so it works for every MCP client (OpenCode,
+Cursor, Claude Code, etc.) without each client having to compute the time.
+
 Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
 </vault-context>
-        `.trim())
+          `.trim())
+        }
+
+        // Tier 2: Session context — first call only (or after compaction)
+        if (!sessionContextInjected) {
+          const context = await loadSessionContext(vaultPath)
+          if (context) {
+            output.system.push(`
+<vault-session-context>
+${context}
+</vault-session-context>
+            `.trim())
+          }
+          sessionContextInjected = true
+        }
       } catch {
         // Never crash the session over vault unavailability
       }
     },
 
+    // ─── Compaction: re-inject snapshot + reset session context ───────────
+    //
+    // INTENTIONALLY DUPLICATIVE: the compactor pushes a snapshot into
+    // output.context (for the compaction summary prompt), AND we reset
+    // sessionContextInjected to false so the next system.transform call
+    // re-injects the full session context. The model sees BOTH:
+    //   - snapshot: kept in the compaction summary
+    //   - full context: pushed to the fresh system prompt after compaction
+    // The cost is ~4K chars of duplication per compaction event — small,
+    // and worth it for the model to have a complete "where am I" view
+    // after context loss. See spec D2 + "What's still missing" notes.
+    //
+    // v2.1 also resets idleNudgeSent so the next idle event after
+    // compaction can re-prompt (one nudge per session-segment).
     "experimental.session.compacting": async (input, output) => {
       try {
         const snapshot = await loadCompactionSnapshot(vaultPath)
         output.context.push(snapshot)
+
+        // Reset — will re-inject full session context after compaction
+        sessionContextInjected = false
+        // Reset — next idle after compaction can re-prompt
+        idleNudgeSent = false
       } catch {
         // Never crash the session over vault unavailability
+      }
+    },
+
+    // ─── Session lifecycle events ─────────────────────────────────────────
+    //
+    // v2.1: session.idle auto-save. When the agent finishes a turn and
+    // the session transitions to idle, re-prompt the model with a
+    // journal nudge. The model decides whether anything is worth
+    // saving — if so, it calls vault_write.
+    //
+    // Why re-prompt vs direct tool call: the model knows what's worth
+    // saving (root causes, architecture decisions, debugging journeys).
+    // The plugin doesn't. Bypassing the model means constructing a
+    // save blindly, which is worse.
+    //
+    // Why fire-and-forget: the event hook handler is async, but
+    // OpenCode's plugin runtime drops the return promise (per
+    // opencode issue #16879). We kick off the call and accept the
+    // window-close risk. Compaction + manual /journal cover the
+    // "guarantee" cases.
+    //
+    // Why a flag: prevents recursion. After the re-prompt, the model
+    // responds, the session goes idle again, the handler fires again.
+    // The flag is set synchronously, so the second fire is a no-op.
+    // Reset on compaction so the next segment can nudge again.
+    event: async ({ event }) => {
+      if (event.type !== "session.idle" || idleNudgeSent) return
+      idleNudgeSent = true
+      try {
+        // v1 SDK shape: { path: { id }, body: { parts } }
+        await client.session.prompt({
+          path: { id: event.properties.sessionID },
+          body: {
+            parts: [
+              { type: "text", text: buildIdleNudgePrompt(todayStr()) },
+            ],
+          },
+        })
+      } catch {
+        // Best-effort. Session is going idle; the call may not land
+        // before the process tears down. Manual /journal covers the
+        // guaranteed-save case.
       }
     },
   }
