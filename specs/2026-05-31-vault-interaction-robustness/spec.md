@@ -105,6 +105,15 @@ another idle, the flag blocks the second handler.
   teardown. Acceptable loss per the user's framing: "if you close
   the window, you shouldn't complain that memory is lost."
 
+### Real timestamps, not hallucinated ones (added during PR development)
+
+The ritual block and idle nudge now inject `currentTimeStr()` (HH:MM
+in 24-hour local time) into the `vault_write` content template.
+Previously the model saw `## HH:MM — Title` and hallucinated the
+time, producing entries that didn't match the actual local clock.
+The model still has to increment manually for multiple entries in
+the same session.
+
 ## Files changed
 
 | File | Change |

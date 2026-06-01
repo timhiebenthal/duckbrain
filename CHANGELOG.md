@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   injected as "today" until 4pm local time, and a just-rolled-over daily
   note would not be picked up until late afternoon.
 
+- **Hallucinated timestamps in daily note ritual**: the ritual block
+  (and the v2.1 session.idle nudge) previously told the model to write
+  `## HH:MM — Title` with `HH:MM` as a literal placeholder. The model
+  would then guess a time, producing entries like "## 14:30" that
+  don't match the actual local clock. Fixed by adding
+  `currentTimeStr()` (HH:MM in 24-hour local time) to the helpers and
+  pre-filling the template. The model still has to increment manually
+  for multiple entries in one session.
+
 - **`tail()` edge case in vault context helpers**: `tail(text, 0)` previously
   returned the full string due to JavaScript's `slice(-0) === slice(0)`
   quirk. Now correctly returns empty string for `lines <= 0`. Caught by
@@ -29,14 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Tests for vault context plugin helpers**
-  (`opencode/plugins/vault-context-helpers.test.ts`): 35 unit tests
-  (was 30, +5 for `buildIdleNudgePrompt`) covering `tail`, `todayStr`,
-  `yesterdayStr`, `loadTags`, `loadSessionContext`,
-  `loadCompactionSnapshot`, `buildIdleNudgePrompt`. Uses real temp
-  directories and `setSystemTime` — no mocks, same convention as
-  duckbrain's Python tests. Verifies TZ behavior in
-  America/Los_Angeles, Asia/Tokyo, and UTC, plus month/year boundaries
-  and missing-file fallbacks.
+  (`opencode/plugins/vault-context-helpers.test.ts`): 42 unit tests
+  (was 30; +5 for `buildIdleNudgePrompt`, +7 for `currentTimeStr`)
+  covering `tail`, `todayStr`, `yesterdayStr`, `currentTimeStr`,
+  `loadTags`, `loadSessionContext`, `loadCompactionSnapshot`,
+  `buildIdleNudgePrompt`. Uses real temp directories and
+  `setSystemTime` — no mocks, same convention as duckbrain's
+  Python tests. Verifies TZ behavior in America/Los_Angeles,
+  Asia/Tokyo, and UTC, plus month/year boundaries and missing-file
+  fallbacks.
 
 - **Test infrastructure for OpenCode plugins**
   (`opencode/plugins/package.json`, `tsconfig.json`): bun test config
@@ -47,12 +57,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the opencode/plugins dependency tree.
 
 - **v2.1 — session.idle auto-save** (`opencode/plugins/vault-context.ts`):
-  New `event` hook listens for `session.idle` and re-prompts the model
-  with a journal nudge via `client.session.prompt()`. The model
-  decides whether anything is worth saving; if so, it calls
-  `vault_write`. Best-effort fire-and-forget for the "agent finished
-  naturally" case. Window close is acceptable loss per the design
-  decision documented in spec D2.
+  **Added during PR development (2026-06-01)** after a spec review
+  caught that the v2 spec incorrectly claimed `session.idle` didn't
+  exist in OpenCode. It does — fired via the `event` hook with
+  `event.type === "session.idle"`. The plugin now listens for it
+  and re-prompts the model with a journal nudge via
+  `client.session.prompt()`. The model decides whether anything is
+  worth saving; if so, it calls `vault_write`. Best-effort
+  fire-and-forget for the "agent finished naturally" case. Window
+  close is acceptable loss per the design decision documented in
+  spec D2 (manual `/journal` covers the "guaranteed save" case).
+
+  **Not part of the original v2 plan.** This was discovered mid-PR
+  when reviewing the spec, validated against the OpenCode SDK
+  (`@opencode-ai/sdk` `EventSessionIdle` type), and added in the
+  same release because the change is small (~25 lines) and the spec
+  already had the v3 stub documented in "What's still missing →
+  No idle auto-save → Possible future approaches." If you'd prefer
+  this in a separate v0.4.1 release, the v2.1 commit
+  (`5b39520`) can be cherry-picked off cleanly.
 
 ### Changed
 

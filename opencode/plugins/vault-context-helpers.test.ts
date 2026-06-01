@@ -15,6 +15,7 @@ import {
   tail,
   todayStr,
   yesterdayStr,
+  currentTimeStr,
   loadTags,
   loadSessionContext,
   loadCompactionSnapshot,
@@ -290,27 +291,71 @@ describe("MAX_LOG_LINES", () => {
 
 describe("buildIdleNudgePrompt", () => {
   test("includes the supplied date in vault_write title", () => {
-    const prompt = buildIdleNudgePrompt("2026-06-15")
+    const prompt = buildIdleNudgePrompt("2026-06-15", "14:30")
     expect(prompt).toContain('title="2026-06-15"')
   })
 
+  test("includes the supplied time in the content template", () => {
+    const prompt = buildIdleNudgePrompt("2026-06-15", "14:30")
+    expect(prompt).toContain("## 14:30 — Topic")
+  })
+
   test("references vault_write with the daily kind", () => {
-    const prompt = buildIdleNudgePrompt("2026-06-15")
+    const prompt = buildIdleNudgePrompt("2026-06-15", "14:30")
     expect(prompt).toContain('vault_write(kind="daily"')
   })
 
   test("instructs the model to skip if nothing new", () => {
-    const prompt = buildIdleNudgePrompt("2026-06-15")
+    const prompt = buildIdleNudgePrompt("2026-06-15", "14:30")
     expect(prompt).toMatch(/nothing new|skip/i)
   })
 
   test("mentions the trigger (session is idle)", () => {
-    const prompt = buildIdleNudgePrompt("2026-06-15")
+    const prompt = buildIdleNudgePrompt("2026-06-15", "14:30")
     expect(prompt.toLowerCase()).toContain("idle")
   })
+})
 
-  test("uses HH:MM timestamp format in the content template", () => {
-    const prompt = buildIdleNudgePrompt("2026-06-15")
-    expect(prompt).toContain("HH:MM")
+// ─── currentTimeStr ──────────────────────────────────────────────────────────
+
+describe("currentTimeStr", () => {
+  test("returns local HH:MM in 24-hour format", () => {
+    setSystemTime(new Date("2026-06-15T14:30:00"))
+    expect(currentTimeStr()).toBe("14:30")
+  })
+
+  test("zero-pads single-digit hours and minutes", () => {
+    setSystemTime(new Date("2026-06-15T03:05:00"))
+    expect(currentTimeStr()).toBe("03:05")
+  })
+
+  test("drops seconds (only HH:MM granularity)", () => {
+    setSystemTime(new Date("2026-06-15T14:30:45"))
+    expect(currentTimeStr()).toBe("14:30")
+  })
+
+  test("TZ fix: uses local timezone, not UTC", () => {
+    // 2026-06-15T03:00:00Z = 2026-06-14 20:00 in America/Los_Angeles
+    // Local time in LA is 20:00, not 03:00 (UTC).
+    process.env.TZ = "America/Los_Angeles"
+    setSystemTime(new Date("2026-06-15T03:00:00Z"))
+    expect(currentTimeStr()).toBe("20:00")
+  })
+
+  test("TZ fix: Tokyo user gets correct local time", () => {
+    // 2026-06-14T16:00:00Z = 2026-06-15 01:00 in Asia/Tokyo
+    process.env.TZ = "Asia/Tokyo"
+    setSystemTime(new Date("2026-06-14T16:00:00Z"))
+    expect(currentTimeStr()).toBe("01:00")
+  })
+
+  test("handles midnight (00:00)", () => {
+    setSystemTime(new Date("2026-06-15T00:00:00"))
+    expect(currentTimeStr()).toBe("00:00")
+  })
+
+  test("handles noon (12:00)", () => {
+    setSystemTime(new Date("2026-06-15T12:00:00"))
+    expect(currentTimeStr()).toBe("12:00")
   })
 })
