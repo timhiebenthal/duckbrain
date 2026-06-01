@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-01
+
+### Fixed
+
+- **Daily note headings now carry the full local date + time, not just
+  the time**: previously the server stamped `## HH:MM — Title`; now it
+  stamps `## YYYY-MM-DD HH:MM — Title`. The full timestamp is
+  self-speaking (no need to look at the filename to know when an entry
+  was made) and works for cross-file queries, grep, and chunking — e.g.
+  "show me everything from 2026-06-01 22:00 onward" returns hits
+  without having to align filename and heading.
+
+- **Daily note no longer has a redundant H1**: the file path
+  (`daily/YYYY-MM-DD.md`) already carries the date, so the writer no
+  longer prepends `# YYYY-MM-DD` as the first line. Old daily files
+  with the redundant H1 can be migrated with
+  `scripts/migrate_v040_to_v041_timestamps.py <vault_path>` (one-time
+  script, idempotent, leaves already-migrated files untouched).
+
 ## [0.4.0] - 2026-06-01
 
 ### Fixed

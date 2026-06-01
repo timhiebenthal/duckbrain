@@ -130,6 +130,45 @@ when a server is consumed by multiple clients, the *invariant*
 lives in the server; the client owns *UX niceties*. We had the
 invariant in the client (DRY violation); now it's in the server.
 
+### v0.4.1 — Self-speaking timestamps + drop redundant H1 (2026-06-01)
+
+**Discovered while reviewing the v0.4.0 PR:** the existing daily
+note in the user's vault had a doubled header (`# 2026-06-01` H1 +
+`## 22:38 — ...` H2 with only the time), and a query like "show me
+everything from 2026-06-01 22:00 onward" required aligning
+filename date with heading time — a pain for grep, chunking, and
+cross-file queries.
+
+**Two changes in v0.4.1 (still honoring the v0.4.0b server-side
+guarantee):**
+
+1. **Heading now carries the full local date + time, not just the
+   time.** Server stamps `## YYYY-MM-DD HH:MM — Title` instead of
+   `## HH:MM — Title`. Same `_ensure_timestamp_on_heading()`
+   function, same idempotency check, just a fuller `strftime`
+   format. The full timestamp is self-speaking — a heading can be
+   read without consulting the filename.
+
+2. **No more H1 on daily files.** The file path
+   (`daily/YYYY-MM-DD.md`) already carries the date, so the
+   writer no longer prepends `# YYYY-MM-DD` as the first line on
+   new-file creation. Old daily files with the redundant H1 can
+   be migrated with `scripts/migrate_v040_to_v041_timestamps.py
+   <vault_path>` (one-time, idempotent).
+
+**Why these aren't a v0.5 feature:** both are tiny, well-tested
+extensions of the v0.4.0b invariant. They share the same
+architectural story (server owns the format, client doesn't
+care). Holding them for v0.5 would be YAGNI ceremony.
+
+**Architectural takeaway** (see wiki concept page
+`wiki/concepts/common-denominator-principle-for-shared-code.md`):
+when the server owns a guarantee, evolving the *format* of that
+guarantee is also a server concern. The OpenCode plugin never
+needed to know about the format change — it still tells the
+model to write `## Topic\n\nDetails`, and the server stamps
+whichever timestamp format is current.
+
 ## Files changed
 
 | File | Change |
@@ -139,7 +178,10 @@ invariant in the client (DRY violation); now it's in the server.
 | `opencode/plugins/vault-context-helpers.test.ts` | 35 unit tests, bun test |
 | `opencode/plugins/package.json`, `tsconfig.json` | Test infrastructure |
 | `src/duckbrain/writer.py` | Added `_ensure_timestamp_on_heading()` — server-side timestamp guarantee |
+| `src/duckbrain/writer.py` (v0.4.1) | Timestamp format `HH:MM` → `YYYY-MM-DD HH:MM`; removed H1 from new daily files |
 | `tests/test_writer.py` | +6 tests for the timestamp guarantee (idempotent, single-digit padding, TZ, integration) |
+| `tests/test_writer.py` (v0.4.1) | Updated 5 existing tests for new format + H1 absence |
+| `scripts/migrate_v040_to_v041_timestamps.py` (v0.4.1) | One-time migration: strip H1, rewrite `## HH:MM —` to `## YYYY-MM-DD HH:MM —` |
 | `wiki/concepts/duckbrain-session-plugin-what-it-does-and-why.md` | Added v2 architecture section |
 | `wiki/concepts/common-denominator-principle-for-shared-code.md` | New concept page — why server owns the guarantee |
 | `wiki/concepts/pick-one-dry-beats-belt-and-suspenders.md` | New concept page — why we dropped the client-side pre-fill |
