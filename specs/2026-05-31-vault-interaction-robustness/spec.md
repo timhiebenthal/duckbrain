@@ -105,21 +105,44 @@ another idle, the flag blocks the second handler.
   teardown. Acceptable loss per the user's framing: "if you close
   the window, you shouldn't complain that memory is lost."
 
-### Real timestamps, not hallucinated ones (added during PR development)
+### Real timestamps, not hallucinated ones (added during PR development, refined after)
 
-The ritual block and idle nudge now inject `currentTimeStr()` (HH:MM
-in 24-hour local time) into the `vault_write` content template.
-Previously the model saw `## HH:MM — Title` and hallucinated the
-time, producing entries that didn't match the actual local clock.
-The model still has to increment manually for multiple entries in
-the same session.
+**Original fix (v0.4.0a):** the TS plugin's `currentTimeStr()` was
+injected into the ritual block and idle nudge so the model saw
+`## 14:30 — Title` with the actual local time, not a placeholder.
+
+**Refined fix (v0.4.0b):** the timestamp guarantee moved from the
+OpenCode plugin to the Python server (`writer.py`'s
+`_ensure_timestamp_on_heading()`). On every daily-note write, the
+server prepends `HH:MM —` to the section heading. The model no
+longer has to know the time at all.
+
+**Why the move:** DRY. The original fix worked for OpenCode but
+meant every other MCP client (Cursor, Claude Code, raw `curl`) had
+to re-implement the same logic to get real timestamps. The server
+is the common denominator across clients — it owns the guarantee.
+The plugin just doesn't tell the model about timestamps anymore
+(`## Topic\n\nDetails` in the template); the server stamps it.
+
+**Architectural principle** (see wiki concept page
+`wiki/concepts/common-denominator-principle-for-shared-code.md`):
+when a server is consumed by multiple clients, the *invariant*
+lives in the server; the client owns *UX niceties*. We had the
+invariant in the client (DRY violation); now it's in the server.
 
 ## Files changed
 
 | File | Change |
 |---|---|
-| `opencode/plugins/vault-context.ts` | v2 rewrite — tiered injection, compaction improvements |
+| `opencode/plugins/vault-context.ts` | v2 rewrite — tiered injection, compaction improvements, v2.1 session.idle hook |
+| `opencode/plugins/vault-context-helpers.ts` | Extracted pure helpers for testability (TDD mandate) |
+| `opencode/plugins/vault-context-helpers.test.ts` | 35 unit tests, bun test |
+| `opencode/plugins/package.json`, `tsconfig.json` | Test infrastructure |
+| `src/duckbrain/writer.py` | Added `_ensure_timestamp_on_heading()` — server-side timestamp guarantee |
+| `tests/test_writer.py` | +6 tests for the timestamp guarantee (idempotent, single-digit padding, TZ, integration) |
 | `wiki/concepts/duckbrain-session-plugin-what-it-does-and-why.md` | Added v2 architecture section |
+| `wiki/concepts/common-denominator-principle-for-shared-code.md` | New concept page — why server owns the guarantee |
+| `wiki/concepts/pick-one-dry-beats-belt-and-suspenders.md` | New concept page — why we dropped the client-side pre-fill |
 | `CHANGELOG.md` | Unreleased entry |
 | `specs/2026-05-31-vault-interaction-robustness/spec.md` | This spec |
 

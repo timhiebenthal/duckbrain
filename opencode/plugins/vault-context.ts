@@ -38,7 +38,6 @@ import {
   loadCompactionSnapshot,
   buildIdleNudgePrompt,
   todayStr,
-  currentTimeStr,
 } from "./vault-context-helpers"
 
 // ─── plugin export ────────────────────────────────────────────────────────────
@@ -79,7 +78,7 @@ ${tags.trim()}
 
 ## Vault learnings ritual
 
-Save learnings via vault_write(kind="daily", title="${todayStr()}", content="## ${currentTimeStr()} — Summary\\n\\n..."):
+Save learnings via vault_write(kind="daily", title="${todayStr()}", content="## Topic\\n\\nDetails"):
 - After completing a task or fixing a bug
 - After finding root cause of a bug
 - After a discovery during investigation
@@ -87,9 +86,10 @@ Save learnings via vault_write(kind="daily", title="${todayStr()}", content="## 
 - After an architecture decision
 - At end of session (/journal)
 
-The HH:MM in the content template is filled in with the current local time
-so daily notes get real timestamps, not hallucinated ones. If you write
-multiple entries in one session, increment the time manually.
+The server prepends HH:MM — to the section heading automatically — you don't
+need to add a timestamp. The model just writes the content; writer.py stamps it.
+This is a server-side guarantee, so it works for every MCP client (OpenCode,
+Cursor, Claude Code, etc.) without each client having to compute the time.
 
 Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
 </vault-context>
@@ -172,7 +172,7 @@ ${context}
           path: { id: event.properties.sessionID },
           body: {
             parts: [
-              { type: "text", text: buildIdleNudgePrompt(todayStr(), currentTimeStr()) },
+              { type: "text", text: buildIdleNudgePrompt(todayStr()) },
             ],
           },
         })

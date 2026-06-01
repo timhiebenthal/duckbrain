@@ -24,10 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (and the v2.1 session.idle nudge) previously told the model to write
   `## HH:MM — Title` with `HH:MM` as a literal placeholder. The model
   would then guess a time, producing entries like "## 14:30" that
-  don't match the actual local clock. Fixed by adding
-  `currentTimeStr()` (HH:MM in 24-hour local time) to the helpers and
-  pre-filling the template. The model still has to increment manually
-  for multiple entries in one session.
+  don't match the actual local clock. Fixed by moving the timestamp
+  guarantee to the server (`writer.py`'s new
+  `_ensure_timestamp_on_heading()`), which prepends `HH:MM —` to the
+  section heading on every daily-note write. The model no longer has
+  to know about or guess the time — it just writes the content; the
+  server stamps it. DRY: same guarantee for every MCP client
+  (OpenCode, Cursor, Claude Code, etc.).
 
 - **`tail()` edge case in vault context helpers**: `tail(text, 0)` previously
   returned the full string due to JavaScript's `slice(-0) === slice(0)`
@@ -38,15 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Tests for vault context plugin helpers**
-  (`opencode/plugins/vault-context-helpers.test.ts`): 42 unit tests
-  (was 30; +5 for `buildIdleNudgePrompt`, +7 for `currentTimeStr`)
-  covering `tail`, `todayStr`, `yesterdayStr`, `currentTimeStr`,
-  `loadTags`, `loadSessionContext`, `loadCompactionSnapshot`,
-  `buildIdleNudgePrompt`. Uses real temp directories and
-  `setSystemTime` — no mocks, same convention as duckbrain's
-  Python tests. Verifies TZ behavior in America/Los_Angeles,
-  Asia/Tokyo, and UTC, plus month/year boundaries and missing-file
-  fallbacks.
+  (`opencode/plugins/vault-context-helpers.test.ts`): 35 unit tests
+  (was 30; +5 for `buildIdleNudgePrompt`) covering `tail`,
+  `todayStr`, `yesterdayStr`, `loadTags`, `loadSessionContext`,
+  `loadCompactionSnapshot`, `buildIdleNudgePrompt`. Uses real
+  temp directories and `setSystemTime` — no mocks, same
+  convention as duckbrain's Python tests. Verifies TZ behavior
+  in America/Los_Angeles, Asia/Tokyo, and UTC, plus month/year
+  boundaries and missing-file fallbacks.
+
+  **`currentTimeStr()` removed** — the timestamp guarantee moved
+  to the Python server (`writer.py:_ensure_timestamp_on_heading()`),
+  so the plugin no longer needs to compute the time locally.
 
 - **Test infrastructure for OpenCode plugins**
   (`opencode/plugins/package.json`, `tsconfig.json`): bun test config
@@ -126,6 +132,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Reduction is ~67%, not ~60%** — actual math is 4K saved / 6K
     baseline. Spec previously understated the win.
 
+### Changed
+
+- **Timestamp guarantee moved from OpenCode plugin to Python server**
+  (`src/duckbrain/writer.py`): The TS plugin previously computed
+  `HH:MM` locally via `currentTimeStr()` and pre-filled the ritual
+  template. That worked for OpenCode but meant every other MCP client
+  (Cursor, Claude Code, raw `curl`) had to re-implement the same
+  logic to get real timestamps — a DRY violation.
+
+  The fix: `_ensure_timestamp_on_heading()` in `writer.py` now
+  prepends `HH:MM —` to the section heading on every daily-note
+  write. The model never has to know the time. The TS plugin's
+  `currentTimeStr()` and the `time` parameter on
+  `buildIdleNudgePrompt` were removed; the ritual template now uses
+  `## Topic\n\nDetails` and the server stamps it.
+
+  **Architectural rationale** (per concept page
+  `wiki/concepts/common-denominator-principle-for-shared-code.md`):
+  when a server is the common denominator across clients, the
+  *guarantee* lives in the server. The client owns UX niceties; the
+  server owns invariants.
+
 ### Notes
 
 - **Versioning note**: `0.4.0b1` was previously published to PyPI for
@@ -141,8 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly as before. This release is internal plugin + tooling
   improvements.
 
-- **Quality gates**: `bun test` 30/30, `bunx tsc --noEmit` clean,
-  `uv run ruff check` clean, `uv run mypy` clean, `uv run pytest` 87/87.
+- **Quality gates**: `bun test` 35/35, `bunx tsc --noEmit` clean,
+  `uv run ruff check` clean, `uv run mypy` clean, `uv run pytest` 93/93.
 
 ## [0.3.1] - 2026-05-30
 

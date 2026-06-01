@@ -69,24 +69,6 @@ export function yesterdayStr(): string {
 }
 
 /**
- * Current local time in HH:MM (24-hour) format.
- *
- * Used in the daily-note ritual block and the session.idle nudge so
- * the model writes `## 14:30 — Title` with the actual local time
- * instead of hallucinating one. Seconds are intentionally dropped
- * — daily note granularity is minutes.
- *
- * TZ-aware: returns the local clock time based on the system's TZ
- * env var (same as `todayStr`).
- */
-export function currentTimeStr(): string {
-  return new Date().toLocaleTimeString("sv-SE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-/**
  * Tier 1: Tags — always injected. Small (~2K), provides topic routing.
  */
 export async function loadTags(vaultPath: string): Promise<string | null> {
@@ -138,8 +120,9 @@ export async function loadCompactionSnapshot(vaultPath: string): Promise<string>
 
   parts.push(`### ⚠️ Journal checkpoint
 This session has been compacted. Before continuing, save any learnings:
-vault_write(kind="daily", title="${todayStr()}", content="## HH:MM — What was done\\n\\n...")
-Format: caveman-concise. Cut filler words.`)
+vault_write(kind="daily", title="${todayStr()}", content="## Topic\\n\\nDetails")
+Format: caveman-concise. Cut filler words. (The server prepends HH:MM — to the
+heading automatically — you don't need to add a timestamp.)`)
 
   return parts.join("\n\n")
 }
@@ -160,8 +143,10 @@ Format: caveman-concise. Cut filler words.`)
  *   to respond, wasting tokens.
  * - Same `vault_write` schema as the ritual block in
  *   system.transform — single source of truth for the call shape.
- * - Includes the actual current local time (HH:MM) so the model
- *   doesn't have to hallucinate one. Same fix as the ritual block.
+ * - Does NOT include a timestamp in the content template — the
+ *   server (writer.py) prepends `HH:MM —` to the section heading on
+ *   every daily-note write. The model doesn't need to know the time
+ *   or hallucinate one. DRY: same guarantee for every MCP client.
  *
  * Known limitation: the prompt appears as a user message in
  * conversation history. The OpenCode SDK's `synthetic: true` flag
@@ -169,6 +154,6 @@ Format: caveman-concise. Cut filler words.`)
  * v0.4.1. For now, accept the visible nudge in the "agent finished
  * naturally" case (user isn't actively watching).
  */
-export function buildIdleNudgePrompt(today: string, time: string): string {
-  return `Session is idle. If you have new learnings, journal them via vault_write(kind="daily", title="${today}", content="## ${time} — Topic\\n\\nDetails"). Follow the format in the vault learnings ritual. If nothing new since your last entry, no response needed.`
+export function buildIdleNudgePrompt(today: string): string {
+  return `Session is idle. If you have new learnings, journal them via vault_write(kind="daily", title="${today}", content="## Topic\\n\\nDetails"). Follow the format in the vault learnings ritual. If nothing new since your last entry, no response needed.`
 }

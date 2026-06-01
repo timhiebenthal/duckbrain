@@ -1,7 +1,7 @@
 """Page creation with frontmatter generation, index/log auto-update."""
 
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,42 @@ KIND_TO_SUBDIR: dict[str, str] = {
     "source": "sources",
     "synthesis": "synthesis",
 }
+
+# Match a time prefix at the start of a heading (e.g. "14:23", "9:05",
+# "09:05"). Used to detect whether a daily-note title already has a
+# timestamp and avoid double-stamping when the title was provided with
+# one (or in a slightly different format).
+_TIME_PREFIX_RE = re.compile(r"^\d{1,2}:\d{2}\b")
+
+
+def _ensure_timestamp_on_heading(title: str) -> str:
+    """Prepend ``HH:MM — `` to a daily-note section title if missing.
+
+    Server-side guarantee: every daily-note write gets a timestamp on
+    its section heading, regardless of which MCP client triggered the
+    call (OpenCode plugin, Cursor, Claude Code, raw ``curl``, etc.).
+    Single source of truth for the invariant — DRY across clients.
+
+    Idempotent: if *title* already starts with a time prefix (with or
+    without the em-dash), the title is returned unchanged. This avoids
+    double-stamping if a client provides a title that already includes
+    a timestamp.
+
+    Honors the ``TZ`` env var (defaults to system TZ). Format is
+    ``strftime("%H:%M")`` which zero-pads single-digit hours and
+    minutes.
+
+    Args:
+        title: Section heading text for a daily entry.
+
+    Returns:
+        Title with ``HH:MM — `` prepended, or unchanged if a time
+        prefix was already present.
+    """
+    if _TIME_PREFIX_RE.match(title):
+        return title
+    time_str = datetime.now().strftime("%H:%M")
+    return f"{time_str} — {title}"
 
 
 def generate_frontmatter(kind: str, title: str, tags: list[str]) -> str:
@@ -114,6 +150,12 @@ def _write_daily(
     today = target_date or date.today().isoformat()
     relative_path = f"daily/{today}.md"
     filepath = Path(vault_path) / relative_path
+
+    # Server-side timestamp guarantee: every daily-note entry has
+    # `## HH:MM —` prepended to the heading. Applies to every MCP client
+    # (DRY). Idempotent: if the title already starts with a time prefix,
+    # the title is returned unchanged.
+    title = _ensure_timestamp_on_heading(title)
 
     # Build the section body (content + tags)
     entry_body = f"\n\n{content}\n"
