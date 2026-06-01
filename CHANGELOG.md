@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Vault context plugin v2** (`opencode/plugins/vault-context.ts`):
+  - **Tiered injection**: tags always (~2K), session context (log + dailies)
+    first-call-only (~4K). Cuts token overhead ~60% after first model call.
+  - **Compaction improvements**: stronger journal nudge ("⚠️ Journal
+    checkpoint"), resets session context for re-injection, compact snapshot
+    (15 log lines not 30).
+  - **Today/yesterday labeling**: daily notes get dedicated labeled sections
+    instead of being buried in a batch.
+
 ## [0.3.1] - 2026-05-30
 
 ### Fixed
