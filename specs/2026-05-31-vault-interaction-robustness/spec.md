@@ -7,14 +7,34 @@ vault context (tags + log tail + 3 daily notes) on EVERY model call — ~6K+ cha
 of system prompt overhead. It relied on a prose instruction for journaling,
 which the model could ignore.
 
-Recently ingested sources (2026-05-31) exposed gaps:
-- Claude Code Hooks (23 hooks) — PreToolUse, PostToolUse, Stop patterns
-- OpenCode Extensibility Guide — 6 extension mechanisms
-- Hindsight plugin — idle auto-save, retain/recall/reflect tools
-- OpenCode Memory Plugin Patterns — guard hooks, compaction survival
-- OpenCode Plugin Sandbox Capabilities — Bun.file() works, everything else blocked
-
 This spec documents what was implemented, what was rejected, and why.
+
+## Sources consulted
+
+| Vault page | Filepath | Informed which decision |
+|---|---|---|
+| [[Claude Code Hooks - all 23 explained and implemented]] | `wiki/sources/Claude Code Hooks - all 23 explained and implemented.md` | D2 (Stop hook limitation), D3 (Prose vs tools) |
+| [[Does OpenCode Support Hooks? A Complete Guide to Extensibility]] | `wiki/sources/Does OpenCode Support Hooks A Complete Guide to Extensibility.md` | D1 (Tiered injection), D2 (Hook surface) |
+| [[Your OpenCode Agent Forgets Everything Between Sessions. Here's the Fix.]] | `wiki/sources/Your OpenCode Agent Forgets Everything Between Sessions. Here's the Fix.md` | D2 (Hindsight idle auto-save), D3 (Retain/recall/reflect) |
+| [[OpenCode Memory Plugin Patterns]] | `wiki/concepts/opencode-memory-plugin-patterns.md` | D2 (Guard hook rejection, compaction survival) |
+| [[OpenCode Plugin Sandbox Capabilities]] | `wiki/concepts/opencode-plugin-sandbox-capabilities.md` | D4 (Tags from file, not scan) |
+| [[Debugging OpenCode Plugins with Probes]] | `wiki/concepts/debugging-opencode-plugins-with-probes.md` | D2 (Hook shapes — `console.log` works, `client.app.log` hangs) |
+| [[DuckBrain Session Plugin — What It Does and Why]] | `wiki/concepts/duckbrain-session-plugin-what-it-does-and-why.md` | Baseline — what v1 did and why it was insufficient |
+
+**Key insights from sources:**
+
+- **Hooks fire regardless of context pressure** (Claude Code Hooks) — hooks catch
+  things prose rules miss. But we have no Stop hook to enforce final write.
+- **OpenCode has 6 extension mechanisms** (Extensibility Guide) — plugins, SDK,
+  MCP, GitHub, custom commands, non-interactive. Plugin path is the only one
+  that fits this work.
+- **Hindsight auto-hooks** (Hindsight source) — recall on start, retain on idle,
+  preserve through compaction. Idle hook is the key — but OpenCode doesn't
+  expose it.
+- **Agent tunnels after ~8 tool calls** (OpenCode Memory Plugin Patterns) —
+  guard hooks catch this. But our guard implementation was too noisy (D2).
+- **Bun.file() works, everything else blocked** (Sandbox Capabilities) —
+  confirmed `wiki/tags.md` is the right path. No directory scanning possible.
 
 ## What shipped
 
