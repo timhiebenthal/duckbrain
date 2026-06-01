@@ -20,89 +20,12 @@
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
-
-// ─── tunables ────────────────────────────────────────────────────────────────
-
-const MAX_LOG_LINES = 30 // tail of wiki/log.md
-
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
-async function safeRead(path: string): Promise<string | null> {
-  try {
-    return await Bun.file(path).text()
-  } catch {
-    return null
-  }
-}
-
-function tail(text: string, lines: number): string {
-  return text.split("\n").slice(-lines).join("\n")
-}
-
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function yesterdayStr(): string {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
-
-// ─── tiered context loaders ──────────────────────────────────────────────────
-
-/**
- * Tier 1: Tags — always injected. Small (~2K), provides topic routing.
- */
-async function loadTags(vaultPath: string): Promise<string | null> {
-  return safeRead(`${vaultPath}/wiki/tags.md`)
-}
-
-/**
- * Tier 2: Session context — injected on first call + after compaction.
- * Log tail + today + yesterday daily notes.
- */
-async function loadSessionContext(vaultPath: string): Promise<string> {
-  const parts: string[] = []
-
-  const log = await safeRead(`${vaultPath}/wiki/log.md`)
-  if (log) {
-    parts.push(`## Recent vault writes\n${tail(log, MAX_LOG_LINES)}`)
-  }
-
-  const today = await safeRead(`${vaultPath}/daily/${todayStr()}.md`)
-  if (today) {
-    parts.push(`## 📅 Today's daily note (${todayStr()})\n${today.trim()}`)
-  }
-
-  const yesterday = await safeRead(`${vaultPath}/daily/${yesterdayStr()}.md`)
-  if (yesterday) {
-    parts.push(`## 📅 Yesterday's daily note (${yesterdayStr()})\n${yesterday.trim()}`)
-  }
-
-  return parts.join("\n\n---\n\n")
-}
-
-/**
- * Compaction snapshot — compact version + journal nudge.
- */
-async function loadCompactionSnapshot(vaultPath: string): Promise<string> {
-  const log = await safeRead(`${vaultPath}/wiki/log.md`)
-  const today = await safeRead(`${vaultPath}/daily/${todayStr()}.md`)
-
-  const parts: string[] = [
-    "The following vault context was active at compaction time and should be preserved:",
-  ]
-  if (log)   parts.push(`### Recent vault writes\n${tail(log, 15)}`)
-  if (today) parts.push(`### Today's daily note (${todayStr()})\n${today.trim()}`)
-
-  parts.push(`### ⚠️ Journal checkpoint
-This session has been compacted. Before continuing, save any learnings:
-vault_write(kind="daily", title="${todayStr()}", content="## HH:MM — What was done\\n\\n...")
-Format: caveman-concise. Cut filler words.`)
-
-  return parts.join("\n\n")
-}
+import {
+  loadTags,
+  loadSessionContext,
+  loadCompactionSnapshot,
+  todayStr,
+} from "./vault-context-helpers"
 
 // ─── plugin export ────────────────────────────────────────────────────────────
 
@@ -110,6 +33,12 @@ export const VaultContextPlugin: Plugin = async ({ client }) => {
   const vaultPath = process.env.VAULT_PATH
   if (!vaultPath) return {}
 
+  // Module-scoped flag. Safe only if OpenCode spawns one plugin
+  // process per session — verified via probe 2026-05-31 (see
+  // specs/2026-05-31-vault-interaction-robustness/spec.md). If
+  // OpenCode ever reuses a process across sessions, this leaks
+  // state — switch to Map<sessionID, bool> using the sessionID
+  // from system.transform input.
   let sessionContextInjected = false
 
   return {
@@ -166,6 +95,16 @@ ${context}
     },
 
     // ─── Compaction: re-inject snapshot + reset session context ───────────
+    //
+    // INTENTIONALLY DUPLICATIVE: the compactor pushes a snapshot into
+    // output.context (for the compaction summary prompt), AND we reset
+    // sessionContextInjected to false so the next system.transform call
+    // re-injects the full session context. The model sees BOTH:
+    //   - snapshot: kept in the compaction summary
+    //   - full context: pushed to the fresh system prompt after compaction
+    // The cost is ~4K chars of duplication per compaction event — small,
+    // and worth it for the model to have a complete "where am I" view
+    // after context loss. See spec D2 + "What's still missing" notes.
     "experimental.session.compacting": async (input, output) => {
       try {
         const snapshot = await loadCompactionSnapshot(vaultPath)

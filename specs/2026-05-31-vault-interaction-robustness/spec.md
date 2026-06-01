@@ -91,7 +91,8 @@ first-call-only.
   "should I use vault tools?"
 - Log + dailies (~4K) are session context — only needed once at start.
   Re-injecting on every call wastes tokens on unchanged content.
-- After first call: ~60% reduction in vault-related system prompt overhead.
+- After first call: ~67% reduction in vault-related system prompt overhead
+  (4K/6K; spec previously said "~60%" — actual math favors the larger number).
 
 **Alternatives considered:**
 - *Inject everything always (v1)* — Simple but wasteful. 6K+ per call adds up.
@@ -101,15 +102,27 @@ first-call-only.
 ### D2: Compaction as the only auto-journal trigger
 
 **Decision:** Rely solely on `experimental.session.compacting` for automatic
-journal nudges. No idle hook, no stop hook, no guard hook.
+journal nudges. No `event` hook handler for `session.idle`, no guard hook.
 
 **Reasoning:**
-- OpenCode has no `session.idle` hook — can't detect when agent pauses
-- OpenCode has no `session.stop` hook — can't enforce final write
-- Compaction fires when session has been running long → natural "should journal"
-  moment. It's the closest proxy for idle.
-- Compaction also triggers context re-injection, so the model gets a fresh
-  view of the vault + the journal nudge in one shot.
+- **`session.idle` event DOES exist** (correction to earlier spec). It's
+  fired via the `event` hook with `event.type === "session.idle"`. BUT the
+  handler is fire-and-forget — the return promise is dropped at
+  `plugin/index.ts` L138. So we cannot block the session transition. We
+  can fire off an async write, but cannot guarantee it completes before
+  the session ends or before the user closes the window.
+- There is no `session.stop` hook. Window close gives <1s.
+- Compaction fires when session has been running long → natural "should
+  journal" moment. It's the closest we can get to guaranteed delivery,
+  because it happens *before* context loss, not at session end.
+- Compaction also triggers context re-injection, so the model gets a
+  fresh view of the vault + the journal nudge in one shot.
+
+**Why not use `session.idle` in v2:** Same compliance problem as the prose
+ritual. The event is fire-and-forget — if we kick off a `vault_write`
+call, we can't wait for it to complete. A v3 could use `session.idle`
+as a *best-effort* auto-save (fire the write, hope it lands), but it
+doesn't replace the compaction nudge as a guaranteed delivery channel.
 
 **Alternatives considered:**
 - *Guard hook (tool.execute.after + system.transform nudge)* — Rejected.
@@ -117,11 +130,22 @@ journal nudges. No idle hook, no stop hook, no guard hook.
   regardless of context. Too noisy. `tool.execute.after` can't inject
   mid-conversation messages — only `system.transform` can, and it fires
   on every call.
-- *session.idle hook* — Doesn't exist in OpenCode's plugin API.
-- *session.stop hook* — Doesn't exist. Even if it did, window closing gives
-  <1s — no time to write.
-- *Auto-save via plugin* — Plugin can't call MCP tools (separate process).
-  Can't write files directly (sandbox blocks import("fs")).
+- *`event` hook listening for `session.idle`* — Could add as best-effort
+  auto-save in v3. Skipped for v2 to ship the compaction path first.
+  Same fire-and-forget limitation as the prose ritual — fire the write,
+  hope it lands before process teardown.
+- *session.stopping hook* — Proposed in OpenCode PR #16598 (March 2026)
+  but not yet merged. **Only helps the "agent finished naturally" case:**
+  when the model decides to stop, the hook can re-prompt with a journal
+  instruction before the loop break. **Does NOT help the "user closes
+  window" case:** the OS kills the process tree before any hook
+  completes. Same limitation as Claude Code's Stop-hook exit-2 pattern,
+  which also re-prompts only when the agent itself wants to stop.
+  Track for v3 as a complement to the in-session compaction channel,
+  not a replacement.
+- *Auto-save via plugin writing directly* — Plugin can't call MCP tools
+  (separate process). Can't write files directly (sandbox blocks
+  `import("fs")`).
 
 ### D3: No explicit retain/recall/reflect tools
 
@@ -157,15 +181,22 @@ scanning `wiki/**/*.md` frontmatter.
 **Gap:** If the model doesn't follow the prose instruction to `vault_write`,
 learnings are lost. No automatic mechanism exists.
 
-**Why not implemented:** OpenCode doesn't expose a `session.idle` hook. The
-plugin API surface is limited to: `system.transform`, `tool.execute.*`,
-`session.compacting`, `event`.
+**Status (post-review):** `session.idle` event DOES exist (`event` hook with
+`event.type === "session.idle"`), but the handler is fire-and-forget. A v3
+could attach a `session.idle` listener that kicks off a `vault_write` call
+as best-effort. Not guaranteed delivery, but better than nothing.
 
 **Possible future approaches:**
-- If OpenCode adds `session.idle` → auto-journal (summarize last assistant
-  message, append to daily note via `vault_write`)
-- If `event` hook captures idle events → use it as idle proxy
-- Workaround: user runs `/journal` command manually at session end
+- v3: add `event: async ({ event }) => { if (event.type === "session.idle")
+  { /* fire-and-forget auto-save */ } }` handler — best-effort, not a
+  guarantee. Same window-close limitation as everything else in this section.
+- If OpenCode merges session.stopping hook (PR #16598) → use it for the
+  "agent finished naturally" case. Window close remains unsolvable by
+  any in-process hook — only manual `/journal` or in-session auto-save
+  (compaction) works there.
+- Workaround: user runs `/journal` command manually before closing the
+  session. This is the only **reliable** way to guarantee a save in the
+  window-close case.
 
 ### No session.stop enforcement
 
