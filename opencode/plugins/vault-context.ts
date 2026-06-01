@@ -1,15 +1,16 @@
 /**
- * DuckBrain vault context plugin for OpenCode — v2
+ * DuckBrain vault context plugin for OpenCode — v2.1
  *
  * Placement:  ~/.config/opencode/plugins/vault-context.ts  (global)
  *         or  .opencode/plugins/vault-context.ts            (project-local)
  *
  * Requires:   VAULT_PATH env var pointing to your Obsidian vault root
  *
- * Architecture: Tiered injection + compaction preservation
+ * Architecture: Tiered injection + compaction preservation + idle auto-save
  *   - Tags: always injected (small ~2K, routing signal)
  *   - Log + dailies: first call only (expensive, session context)
  *   - Compaction: re-inject snapshot + journal nudge
+ *   - session.idle: re-prompt model to journal before session ends
  *
  * Proven constraints (from probe):
  *   ✅  Bun.file(path).text()     — works, use this for all file reads
@@ -17,6 +18,17 @@
  *   ✅  process.env / Bun.env     — works
  *   ✅  output.system.push()      — mutations reach the LLM
  *   ✅  experimental.session.compacting — fires, output.context.push() works
+ *   ✅  event hook                — fires with EventSessionIdle; client.session.prompt() works
+ *
+ * v2.1 additions (this file):
+ *   - Added `event` hook listening for `session.idle` to re-prompt the
+ *     model with a journal nudge via client.session.prompt(). Best-effort
+ *     auto-save for the "agent finished naturally" case. Fire-and-forget
+ *     by design — window-close is acceptable loss (user can run /journal
+ *     before close for guaranteed save).
+ *   - Added `idleNudgeSent` flag, reset on compaction (same pattern as
+ *     `sessionContextInjected`). Prevents recursion: one nudge per
+ *     session-segment between compactions.
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
@@ -24,6 +36,7 @@ import {
   loadTags,
   loadSessionContext,
   loadCompactionSnapshot,
+  buildIdleNudgePrompt,
   todayStr,
 } from "./vault-context-helpers"
 
@@ -33,13 +46,14 @@ export const VaultContextPlugin: Plugin = async ({ client }) => {
   const vaultPath = process.env.VAULT_PATH
   if (!vaultPath) return {}
 
-  // Module-scoped flag. Safe only if OpenCode spawns one plugin
+  // Module-scoped flags. Safe only if OpenCode spawns one plugin
   // process per session — verified via probe 2026-05-31 (see
   // specs/2026-05-31-vault-interaction-robustness/spec.md). If
-  // OpenCode ever reuses a process across sessions, this leaks
+  // OpenCode ever reuses a process across sessions, these leak
   // state — switch to Map<sessionID, bool> using the sessionID
   // from system.transform input.
   let sessionContextInjected = false
+  let idleNudgeSent = false
 
   return {
     // ─── Tiered system prompt injection ──────────────────────────────────
@@ -105,6 +119,9 @@ ${context}
     // The cost is ~4K chars of duplication per compaction event — small,
     // and worth it for the model to have a complete "where am I" view
     // after context loss. See spec D2 + "What's still missing" notes.
+    //
+    // v2.1 also resets idleNudgeSent so the next idle event after
+    // compaction can re-prompt (one nudge per session-segment).
     "experimental.session.compacting": async (input, output) => {
       try {
         const snapshot = await loadCompactionSnapshot(vaultPath)
@@ -112,8 +129,52 @@ ${context}
 
         // Reset — will re-inject full session context after compaction
         sessionContextInjected = false
+        // Reset — next idle after compaction can re-prompt
+        idleNudgeSent = false
       } catch {
         // Never crash the session over vault unavailability
+      }
+    },
+
+    // ─── Session lifecycle events ─────────────────────────────────────────
+    //
+    // v2.1: session.idle auto-save. When the agent finishes a turn and
+    // the session transitions to idle, re-prompt the model with a
+    // journal nudge. The model decides whether anything is worth
+    // saving — if so, it calls vault_write.
+    //
+    // Why re-prompt vs direct tool call: the model knows what's worth
+    // saving (root causes, architecture decisions, debugging journeys).
+    // The plugin doesn't. Bypassing the model means constructing a
+    // save blindly, which is worse.
+    //
+    // Why fire-and-forget: the event hook handler is async, but
+    // OpenCode's plugin runtime drops the return promise (per
+    // opencode issue #16879). We kick off the call and accept the
+    // window-close risk. Compaction + manual /journal cover the
+    // "guarantee" cases.
+    //
+    // Why a flag: prevents recursion. After the re-prompt, the model
+    // responds, the session goes idle again, the handler fires again.
+    // The flag is set synchronously, so the second fire is a no-op.
+    // Reset on compaction so the next segment can nudge again.
+    event: async ({ event }) => {
+      if (event.type !== "session.idle" || idleNudgeSent) return
+      idleNudgeSent = true
+      try {
+        // v1 SDK shape: { path: { id }, body: { parts } }
+        await client.session.prompt({
+          path: { id: event.properties.sessionID },
+          body: {
+            parts: [
+              { type: "text", text: buildIdleNudgePrompt(todayStr()) },
+            ],
+          },
+        })
+      } catch {
+        // Best-effort. Session is going idle; the call may not land
+        // before the process tears down. Manual /journal covers the
+        // guaranteed-save case.
       }
     },
   }

@@ -29,9 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Tests for vault context plugin helpers**
-  (`opencode/plugins/vault-context-helpers.test.ts`): 30 unit tests
-  covering `tail`, `todayStr`, `yesterdayStr`, `loadTags`,
-  `loadSessionContext`, `loadCompactionSnapshot`. Uses real temp
+  (`opencode/plugins/vault-context-helpers.test.ts`): 35 unit tests
+  (was 30, +5 for `buildIdleNudgePrompt`) covering `tail`, `todayStr`,
+  `yesterdayStr`, `loadTags`, `loadSessionContext`,
+  `loadCompactionSnapshot`, `buildIdleNudgePrompt`. Uses real temp
   directories and `setSystemTime` — no mocks, same convention as
   duckbrain's Python tests. Verifies TZ behavior in
   America/Los_Angeles, Asia/Tokyo, and UTC, plus month/year boundaries
@@ -44,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`node_modules/` in `.gitignore`**: prevents accidental commits of
   the opencode/plugins dependency tree.
+
+- **v2.1 — session.idle auto-save** (`opencode/plugins/vault-context.ts`):
+  New `event` hook listens for `session.idle` and re-prompts the model
+  with a journal nudge via `client.session.prompt()`. The model
+  decides whether anything is worth saving; if so, it calls
+  `vault_write`. Best-effort fire-and-forget for the "agent finished
+  naturally" case. Window close is acceptable loss per the design
+  decision documented in spec D2.
 
 ### Changed
 

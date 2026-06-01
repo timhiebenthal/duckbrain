@@ -70,6 +70,41 @@ Instead of being buried in a batch with the log tail.
 
 **Evaluated and rejected.** See Decision Record below.
 
+### v2.1 — session.idle auto-save (added 2026-06-01)
+
+After spec review caught the `session.idle` availability error, added
+the v3 plan to the plugin. When the agent finishes a turn and the
+session transitions to `session.idle`, the plugin re-prompts the
+model with a journal nudge via `client.session.prompt()`. The model
+decides whether anything is worth saving; if so, it calls
+`vault_write`.
+
+**Why re-prompt vs direct tool call:** the model knows what's worth
+saving (root causes, architecture decisions, debugging journeys). The
+plugin doesn't. Bypassing the model means constructing a save
+blindly, which is worse.
+
+**Why fire-and-forget:** the `event` hook handler is async but
+OpenCode drops the return promise (per opencode issue #16879). The
+plugin kicks off the call and accepts the window-close risk.
+Compaction + manual `/journal` cover the "guaranteed save" cases —
+this just adds a best-effort channel for the "agent finished
+naturally" case.
+
+**Recursion guard:** `idleNudgeSent` flag, set synchronously on
+first fire, reset on compaction. One nudge per session-segment
+between compactions. Even if the re-prompt response triggers
+another idle, the flag blocks the second handler.
+
+**Known limitations:**
+- The re-prompt appears as a user message in conversation history
+  (the `synthetic: true` flag on `TextPartInput` might suppress
+  this — worth investigating for v0.4.1).
+- Window close = no save. Same as everything else in this spec.
+- Fire-and-forget, so the call might not complete before process
+  teardown. Acceptable loss per the user's framing: "if you close
+  the window, you shouldn't complain that memory is lost."
+
 ## Files changed
 
 | File | Change |
@@ -176,35 +211,21 @@ scanning `wiki/**/*.md` frontmatter.
 
 ## What's still missing
 
-### No idle auto-save
+### Idle auto-save — implemented in v2.1 ✅
 
-**Gap:** If the model doesn't follow the prose instruction to `vault_write`,
-learnings are lost. No automatic mechanism exists.
-
-**Status (post-review):** `session.idle` event DOES exist (`event` hook with
-`event.type === "session.idle"`), but the handler is fire-and-forget. A v3
-could attach a `session.idle` listener that kicks off a `vault_write` call
-as best-effort. Not guaranteed delivery, but better than nothing.
-
-**Possible future approaches:**
-- v3: add `event: async ({ event }) => { if (event.type === "session.idle")
-  { /* fire-and-forget auto-save */ } }` handler — best-effort, not a
-  guarantee. Same window-close limitation as everything else in this section.
-- If OpenCode merges session.stopping hook (PR #16598) → use it for the
-  "agent finished naturally" case. Window close remains unsolvable by
-  any in-process hook — only manual `/journal` or in-session auto-save
-  (compaction) works there.
-- Workaround: user runs `/journal` command manually before closing the
-  session. This is the only **reliable** way to guarantee a save in the
-  window-close case.
+See "What shipped → v2.1 — session.idle auto-save" above. The gap is
+closed: best-effort fire-and-forget re-prompt on `session.idle`.
+Window-close remains unsolvable by any in-process hook — that's
+fundamentally a platform limitation, not a plugin one.
 
 ### No session.stop enforcement
 
 **Gap:** When user closes the window, session ends abruptly. No time to write.
 
 **Why not implemented:** Even if a stop hook existed, window close gives <1s.
-The compaction journal nudge is the best proactive alternative — it fires
-before the session ends, giving the model a chance to write.
+The compaction journal nudge + the new session.idle re-prompt are the best
+proactive alternatives — both fire before the session ends, giving the model
+a chance to write. Neither is a guarantee for window-close.
 
 ### No selective injection for non-vault tasks
 
@@ -232,4 +253,10 @@ if current working directory is inside VAULT_PATH.
 3. **Should we move the learnings ritual out of the plugin and into a
    dedicated MCP tool?** — e.g., `vault_journal` that auto-summarizes and
    writes. Keeps the plugin lean, moves compliance to tool-calling (which
-   models are better at than prose following).
+   models are better at than prose following). **Probably not** — moving
+   from prose-compliance to tool-compliance doesn't fix the underlying
+   model-can-still-ignore problem. Same compliance surface, extra steps.
+
+4. **(v2.1 follow-up) Suppress the re-prompt from conversation history** —
+   The `synthetic: true` flag on `TextPartInput` might make the nudge
+   invisible to the user. Investigate for v0.4.1.

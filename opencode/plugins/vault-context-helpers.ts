@@ -125,3 +125,30 @@ Format: caveman-concise. Cut filler words.`)
 
   return parts.join("\n\n")
 }
+
+/**
+ * Idle re-prompt message — sent to the model on `session.idle` so it
+ * has a chance to journal learnings before the session ends.
+ *
+ * Why a separate helper: pure function, easy to unit-test. The hook
+ * handler in vault-context.ts just calls this and sends the result
+ * via client.session.prompt().
+ *
+ * Design choices:
+ * - "If you have new learnings" — gives the model a skip condition
+ *   so an empty session doesn't trigger a no-op write.
+ * - "No response needed" — tells the model that silence is OK if
+ *   there's nothing to save. Without this the model feels compelled
+ *   to respond, wasting tokens.
+ * - Same `vault_write` schema as the ritual block in
+ *   system.transform — single source of truth for the call shape.
+ *
+ * Known limitation: the prompt appears as a user message in
+ * conversation history. The OpenCode SDK's `synthetic: true` flag
+ * on TextPartInput might suppress this — worth investigating for
+ * v0.4.1. For now, accept the visible nudge in the "agent finished
+ * naturally" case (user isn't actively watching).
+ */
+export function buildIdleNudgePrompt(today: string): string {
+  return `Session is idle. If you have new learnings, journal them via vault_write(kind="daily", title="${today}", content="## HH:MM — Topic\\n\\nDetails"). Follow the format in the vault learnings ritual. If nothing new since your last entry, no response needed.`
+}

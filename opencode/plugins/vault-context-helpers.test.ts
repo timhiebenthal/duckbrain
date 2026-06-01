@@ -18,6 +18,7 @@ import {
   loadTags,
   loadSessionContext,
   loadCompactionSnapshot,
+  buildIdleNudgePrompt,
   MAX_LOG_LINES,
 } from "./vault-context-helpers"
 
@@ -282,5 +283,34 @@ describe("loadCompactionSnapshot", () => {
 describe("MAX_LOG_LINES", () => {
   test("is 30 (matches spec tier 2 claim)", () => {
     expect(MAX_LOG_LINES).toBe(30)
+  })
+})
+
+// ─── buildIdleNudgePrompt ────────────────────────────────────────────────────
+
+describe("buildIdleNudgePrompt", () => {
+  test("includes the supplied date in vault_write title", () => {
+    const prompt = buildIdleNudgePrompt("2026-06-15")
+    expect(prompt).toContain('title="2026-06-15"')
+  })
+
+  test("references vault_write with the daily kind", () => {
+    const prompt = buildIdleNudgePrompt("2026-06-15")
+    expect(prompt).toContain('vault_write(kind="daily"')
+  })
+
+  test("instructs the model to skip if nothing new", () => {
+    const prompt = buildIdleNudgePrompt("2026-06-15")
+    expect(prompt).toMatch(/nothing new|skip/i)
+  })
+
+  test("mentions the trigger (session is idle)", () => {
+    const prompt = buildIdleNudgePrompt("2026-06-15")
+    expect(prompt.toLowerCase()).toContain("idle")
+  })
+
+  test("uses HH:MM timestamp format in the content template", () => {
+    const prompt = buildIdleNudgePrompt("2026-06-15")
+    expect(prompt).toContain("HH:MM")
   })
 })
