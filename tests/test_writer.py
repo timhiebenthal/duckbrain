@@ -442,6 +442,7 @@ def test_write_daily_no_index_update(temp_vault: Path) -> None:
 def test_write_daily_dedup_merges_same_title(temp_vault: Path) -> None:
     """Writing same title twice merges, not duplicates."""
     import re
+
     from duckbrain.writer import write_page
 
     today = date.today().isoformat()
@@ -464,6 +465,7 @@ def test_write_daily_target_date_writes_past_file(temp_vault: Path) -> None:
     the date, and the H2 stamp uses the current date+time (when the
     write happened), not the target_date."""
     import re
+
     from duckbrain.writer import write_page
 
     write_page(
@@ -485,6 +487,28 @@ def test_write_daily_target_date_writes_past_file(temp_vault: Path) -> None:
     assert not (temp_vault / f"daily/{today}.md").exists()
 
 
+def test_write_daily_rejects_bare_date_title(temp_vault: Path) -> None:
+    """v0.4.1+: reject title='YYYY-MM-DD' (bare ISO date string).
+
+    The server stamps a timestamp onto the title automatically, so a
+    bare date produces a double-stamped heading like
+    '## 2026-06-02 12:34 — 2026-06-02'. The file path is the date;
+    the server's heading stamp adds HH:MM. Caller must pass a real
+    section name (e.g., 'Topic (Category)').
+    """
+    from duckbrain.writer import write_page
+
+    today = date.today().isoformat()
+    result = write_page(str(temp_vault), "daily", today, "Body.", ["a"])
+
+    assert result["success"] is False, result
+    assert any(
+        "title" in w.lower() and "date" in w.lower() for w in result["warnings"]
+    ), result
+    # The file must NOT be created on rejection
+    assert not (temp_vault / f"daily/{today}.md").exists()
+
+
 # ── Daily timestamp guarantee tests (server-side, DRY) ────────────────────────
 #
 # The timestamp on a daily-note heading is a SERVER guarantee, not a
@@ -497,6 +521,7 @@ def test_write_daily_target_date_writes_past_file(temp_vault: Path) -> None:
 def test_ensure_timestamp_on_heading_prepends_when_missing() -> None:
     """Title without a timestamp gets `YYYY-MM-DD HH:MM — ` prepended."""
     import re
+
     from duckbrain.writer import _ensure_timestamp_on_heading
 
     result = _ensure_timestamp_on_heading("Debugging session")
@@ -566,6 +591,7 @@ def test_write_daily_adds_timestamp_to_heading(temp_vault: Path) -> None:
     to the first H2 heading of the daily note. v0.4.1: no H1 — the file
     path is the date."""
     import re
+
     from duckbrain.writer import write_page
 
     write_page(

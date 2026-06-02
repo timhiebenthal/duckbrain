@@ -32,6 +32,16 @@ KIND_TO_SUBDIR: dict[str, str] = {
 # (or in a slightly different format).
 _TIMESTAMP_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}\b")
 
+# A bare ISO date string (e.g., "2026-06-02") is rejected as a daily-note
+# section title: the server stamps a full `YYYY-MM-DD HH:MM —` onto the
+# title automatically, so a bare date produces a double-stamped heading
+# like `## 2026-06-02 12:34 — 2026-06-02`. The file path is the date;
+# the server's heading stamp adds HH:MM. Caller must pass a real section
+# name (e.g., "Topic (Category)"). This guard catches callers that
+# follow the v0.4.0-era LEARNINGS convention (`title="YYYY-MM-DD"`) —
+# that convention doesn't apply under v0.4.1.
+_DAILY_DATE_ONLY_TITLE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 
 def _ensure_timestamp_on_heading(title: str) -> str:
     """Prepend ``YYYY-MM-DD HH:MM — `` to a daily-note section title if missing.
@@ -157,6 +167,25 @@ def _write_daily(
     today = target_date or date.today().isoformat()
     relative_path = f"daily/{today}.md"
     filepath = Path(vault_path) / relative_path
+
+    # Reject bare-date titles. v0.4.0-era callers passed the date as
+    # the section title; under v0.4.1 the server stamps a timestamp
+    # onto the title, which would produce a double-stamped heading.
+    if _DAILY_DATE_ONLY_TITLE_RE.match(title):
+        return {
+            "success": False,
+            "filepath": relative_path,
+            "warnings": [
+                f"title='{title}' looks like a bare date string. "
+                "The v0.4.1 server stamps a full timestamp onto the "
+                "title automatically, so passing the date would "
+                "produce a double-stamped heading like "
+                "'## 2026-06-02 12:34 — 2026-06-02'. The file path is "
+                "the date; the server's heading stamp adds HH:MM. "
+                "Pass a real section name (e.g., 'Topic (Category)') "
+                "and the body without a leading H2."
+            ],
+        }
 
     # Server-side timestamp guarantee: every daily-note entry has
     # `## YYYY-MM-DD HH:MM —` prepended to the heading. Applies to

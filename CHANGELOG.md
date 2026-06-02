@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the redundant H1 can be migrated manually (one-time, on the
   user's vault).
 
+- **Server rejects `title="YYYY-MM-DD"` for daily notes**: the v0.4.0-era
+  LEARNINGS convention (`title="YYYY-MM-DD"`) no longer works under
+  v0.4.1, because the server stamps a full `YYYY-MM-DD HH:MM —` onto
+  the title automatically, producing a double-stamped heading like
+  `## 2026-06-02 12:34 — 2026-06-02`. The server now rejects bare ISO
+  date strings with a clear error explaining that the file path is the
+  date and the caller should pass a real section name
+  (e.g., `"Topic (Category)"`). Tested: a new test asserts the
+  rejection + that no file is created on the failed call.
+
 ## [0.4.0] - 2026-06-01
 
 ### Fixed
