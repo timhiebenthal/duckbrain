@@ -22,9 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Daily note no longer has a redundant H1**: the file path
   (`daily/YYYY-MM-DD.md`) already carries the date, so the writer no
   longer prepends `# YYYY-MM-DD` as the first line. Old daily files
-  with the redundant H1 can be migrated with
-  `scripts/migrate_v040_to_v041_timestamps.py <vault_path>` (one-time
-  script, idempotent, leaves already-migrated files untouched).
+  with the redundant H1 can be migrated manually (one-time, on the
+  user's vault).
 
 ## [0.4.0] - 2026-06-01
 

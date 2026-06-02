@@ -153,8 +153,7 @@ guarantee):**
    (`daily/YYYY-MM-DD.md`) already carries the date, so the
    writer no longer prepends `# YYYY-MM-DD` as the first line on
    new-file creation. Old daily files with the redundant H1 can
-   be migrated with `scripts/migrate_v040_to_v041_timestamps.py
-   <vault_path>` (one-time, idempotent).
+   be migrated manually (one-time, on the user's vault).
 
 **Why these aren't a v0.5 feature:** both are tiny, well-tested
 extensions of the v0.4.0b invariant. They share the same
@@ -181,7 +180,6 @@ whichever timestamp format is current.
 | `src/duckbrain/writer.py` (v0.4.1) | Timestamp format `HH:MM` → `YYYY-MM-DD HH:MM`; removed H1 from new daily files |
 | `tests/test_writer.py` | +6 tests for the timestamp guarantee (idempotent, single-digit padding, TZ, integration) |
 | `tests/test_writer.py` (v0.4.1) | Updated 5 existing tests for new format + H1 absence |
-| `scripts/migrate_v040_to_v041_timestamps.py` (v0.4.1) | One-time migration: strip H1, rewrite `## HH:MM —` to `## YYYY-MM-DD HH:MM —` |
 | `wiki/concepts/duckbrain-session-plugin-what-it-does-and-why.md` | Added v2 architecture section |
 | `wiki/concepts/common-denominator-principle-for-shared-code.md` | New concept page — why server owns the guarantee |
 | `wiki/concepts/pick-one-dry-beats-belt-and-suspenders.md` | New concept page — why we dropped the client-side pre-fill |
