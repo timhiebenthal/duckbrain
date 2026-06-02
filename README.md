@@ -8,22 +8,27 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read
 
 ## Installation
 
-Pick your agent:
+Install DuckBrain:
+
+```bash
+pip install duckbrain
+```
+
+... or with the dependency manager of your choice (uv, poetry, ...)
+
+Then pick your agent:
 
 - [OpenCode](#opencode) — MCP server + session plugin (recommended)
 - [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
 - [Cursor](#cursor) — MCP server + rules + hooks
 - [Hermes](#hermes) — MCP server + AGENTS.md
+- Other Agents (e.g. Codex, Gemini) will follow after testing
 
 ---
 
 ### OpenCode
 
-**Best experience** — session plugin gives the AI automatic vault awareness.
-
-```bash
-pip install duckbrain
-```
+**Best experience** (as I use OpenCode myself) — session plugin gives the AI automatic vault awareness.
 
 Add to `opencode.json`:
 
@@ -31,8 +36,7 @@ Add to `opencode.json`:
 {
   "mcp": {
     "duckbrain": {
-      "command": "uv",
-      "args": ["run", "duckbrain"],
+      "command": "duckbrain",
       "env": { "VAULT_PATH": "/path/to/your/vault" }
     }
   }
@@ -63,9 +67,7 @@ Restart OpenCode. The plugin gives your AI automatic vault awareness and a few u
 
 ### Claude Code
 
-```bash
-pip install duckbrain
-```
+**Disclaimer:** Not tested yet
 
 Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
 
@@ -73,8 +75,7 @@ Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
 {
   "mcpServers": {
     "duckbrain": {
-      "command": "uv",
-      "args": ["run", "duckbrain"],
+      "command": "duckbrain",
       "env": { "VAULT_PATH": "/path/to/your/vault" }
     }
   }
@@ -167,9 +168,7 @@ Restart Claude Code.
 
 ### Cursor
 
-```bash
-pip install duckbrain
-```
+**Disclaimer:** Not tested yet
 
 Add to `.cursor/mcp.json`:
 
@@ -177,8 +176,7 @@ Add to `.cursor/mcp.json`:
 {
   "mcpServers": {
     "duckbrain": {
-      "command": "uv",
-      "args": ["run", "duckbrain"],
+      "command": "duckbrain",
       "env": { "VAULT_PATH": "/path/to/your/vault" }
     }
   }
@@ -248,7 +246,9 @@ Restart Cursor.
 
 ---
 
-### Hermes
+### Hermes Agent
+
+Has been tested and validated.
 
 Add to `mcp.json`:
 
