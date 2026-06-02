@@ -130,6 +130,73 @@ when a server is consumed by multiple clients, the *invariant*
 lives in the server; the client owns *UX niceties*. We had the
 invariant in the client (DRY violation); now it's in the server.
 
+### v0.4.1 — Self-speaking timestamps + drop redundant H1 (2026-06-01)
+
+**Discovered while reviewing the v0.4.0 PR:** the existing daily
+note in the user's vault had a doubled header (`# 2026-06-01` H1 +
+`## 22:38 — ...` H2 with only the time), and a query like "show me
+everything from 2026-06-01 22:00 onward" required aligning
+filename date with heading time — a pain for grep, chunking, and
+cross-file queries.
+
+**Two changes in v0.4.1 (still honoring the v0.4.0b server-side
+guarantee):**
+
+1. **Heading now carries the full local date + time, not just the
+   time.** Server stamps `## YYYY-MM-DD HH:MM — Title` instead of
+   `## HH:MM — Title`. Same `_ensure_timestamp_on_heading()`
+   function, same idempotency check, just a fuller `strftime`
+   format. The full timestamp is self-speaking — a heading can be
+   read without consulting the filename.
+
+2. **No more H1 on daily files.** The file path
+   (`daily/YYYY-MM-DD.md`) already carries the date, so the
+   writer no longer prepends `# YYYY-MM-DD` as the first line on
+   new-file creation. Old daily files with the redundant H1 can
+   be migrated manually (one-time, on the user's vault).
+
+**Why these aren't a v0.5 feature:** both are tiny, well-tested
+extensions of the v0.4.0b invariant. They share the same
+architectural story (server owns the format, client doesn't
+care). Holding them for v0.5 would be YAGNI ceremony.
+
+### v0.4.1d — Server-side guard against bare-date titles (2026-06-02)
+
+**Discovered in the same PR cycle:** the v0.4.0-era LEARNINGS
+convention says to call daily writes with `title="YYYY-MM-DD"`. Under
+v0.4.1, `_ensure_timestamp_on_heading()` stamps a full timestamp onto
+the title automatically, so passing the date produces a double-stamped
+heading like `## 2026-06-02 12:34 — 2026-06-02`. The bug was
+documented (3 occurrences in one day) but never caught at the server.
+
+**Fix:** `_write_daily()` now rejects titles matching
+`^\d{4}-\d{2}-\d{2}$` with a clear error message and
+`success=False`. The file is NOT created on rejection. Caller gets
+the warning explaining the convention change and how to fix it
+(pass a real section name like `"Topic (Category)"`).
+
+**Why a server-side guard instead of just docs:** the convention is
+deeply ingrained in the model's training prompt (LEARNINGS.md
+prescribes `title="YYYY-MM-DD"`). Docs alone didn't prevent the bug —
+even after documenting the failure mode, the model repeated the same
+mistake. Same pattern as the v0.4.0 server-side timestamp guarantee:
+when callers can't be trusted to do the right thing, the server
+enforces it. Defensive, in line with the existing architecture.
+
+**Tradeoff:** callers using the v0.4.0 convention now get a hard
+error instead of a double-stamped file. This is a breaking change
+in the strictest sense, but the only caller (the user's OpenCode
+session) is already running v0.4.1 and explicitly opted into the new
+behavior. The PR's CHANGELOG entry documents the breaking change.
+
+**Architectural takeaway** (see wiki concept page
+`wiki/concepts/common-denominator-principle-for-shared-code.md`):
+when the server owns a guarantee, evolving the *format* of that
+guarantee is also a server concern. The OpenCode plugin never
+needed to know about the format change — it still tells the
+model to write `## Topic\n\nDetails`, and the server stamps
+whichever timestamp format is current.
+
 ## Files changed
 
 | File | Change |
@@ -139,7 +206,11 @@ invariant in the client (DRY violation); now it's in the server.
 | `opencode/plugins/vault-context-helpers.test.ts` | 35 unit tests, bun test |
 | `opencode/plugins/package.json`, `tsconfig.json` | Test infrastructure |
 | `src/duckbrain/writer.py` | Added `_ensure_timestamp_on_heading()` — server-side timestamp guarantee |
+| `src/duckbrain/writer.py` (v0.4.1) | Timestamp format `HH:MM` → `YYYY-MM-DD HH:MM`; removed H1 from new daily files |
 | `tests/test_writer.py` | +6 tests for the timestamp guarantee (idempotent, single-digit padding, TZ, integration) |
+| `tests/test_writer.py` (v0.4.1) | Updated 5 existing tests for new format + H1 absence |
+| `src/duckbrain/writer.py` (v0.4.1d) | Reject `title="YYYY-MM-DD"` for daily writes (bare-date guard) |
+| `tests/test_writer.py` (v0.4.1d) | +1 test for bare-date rejection |
 | `wiki/concepts/duckbrain-session-plugin-what-it-does-and-why.md` | Added v2 architecture section |
 | `wiki/concepts/common-denominator-principle-for-shared-code.md` | New concept page — why server owns the guarantee |
 | `wiki/concepts/pick-one-dry-beats-belt-and-suspenders.md` | New concept page — why we dropped the client-side pre-fill |
