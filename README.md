@@ -73,9 +73,9 @@ Restart OpenCode. The plugin gives your AI automatic vault awareness and a few u
 
 ```bash
 claude plugin marketplace add /path/to/duckbrain/claude/
-claude plugin install duckbrain@duckbrain
+claude plugin install duckbrain@duckbrain-local
 # Claude Code prompts for your vault path, or pass it non-interactively:
-# claude plugin install duckbrain@duckbrain --config vault_path=/path/to/vault
+# claude plugin install duckbrain@duckbrain-local --config vault_path=/path/to/vault
 ```
 
 Claude Code prompts for your vault path at enable time — no manual `VAULT_PATH` env var needed.
