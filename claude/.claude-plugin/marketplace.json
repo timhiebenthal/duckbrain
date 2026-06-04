@@ -1,0 +1,9 @@
+{
+  "name": "duckbrain",
+  "plugins": [
+    {
+      "name": "duckbrain",
+      "source": "./"
+    }
+  ]
+}
