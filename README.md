@@ -67,102 +67,40 @@ Restart OpenCode. The plugin gives your AI automatic vault awareness and a few u
 
 ### Claude Code
 
-**Disclaimer:** Not tested yet
+**Prerequisite:** `pip install duckbrain` (puts the `duckbrain` MCP server on your PATH)
 
-Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
-
-```json
-{
-  "mcpServers": {
-    "duckbrain": {
-      "command": "duckbrain",
-      "env": { "VAULT_PATH": "/path/to/your/vault" }
-    }
-  }
-}
-```
-
-#### CLAUDE.md
-
-Add to `.claude/CLAUDE.md`:
-
-```markdown
-# DuckBrain vault
-
-Call vault_info() at session start to discover vault topics.
-Use vault_search() or vault_read() when the query matches vault content.
-Use vault_context() to load daily notes and search in one call.
-After non-trivial work, save learnings with vault_write().
-```
-
-#### SessionStart hook (optional — auto-context)
-
-> **Prototype** — based on Claude Code docs, not yet validated end-to-end. Scripts work, but hook → injection pipeline needs manual verification.
-
-For automatic vault awareness without manual tool calls, add a SessionStart hook.
-Download the script (no repo clone needed):
+#### Install via plugin marketplace
 
 ```bash
-mkdir -p ~/.claude/hooks/
-curl -o ~/.claude/hooks/vault-context.sh \
-  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/claude-vault-context.sh
-chmod +x ~/.claude/hooks/vault-context.sh
+claude plugin marketplace add /path/to/duckbrain/claude/
+claude plugin install duckbrain@duckbrain
 ```
 
-Add to the same `.claude/settings.json`:
+Claude Code prompts for your vault path at enable time — no manual `VAULT_PATH` env var needed.
 
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/full/path/to/.claude/hooks/vault-context.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
+#### What you get
+
+```
+Enable plugin → prompted for vault path once
+     ↓
+Session start → SessionStart injects LEARNINGS guard + tags + daily notes
+     ↓
+During session → guard prompts Claude to journal after non-trivial work
+     ↓
+Every ~15 min → UserPromptSubmit re-surfaces the concise journal nudge (throttled)
+     ↓
+Context full → PreCompact injects snapshot + journal nudge
+     ↓
+Session end → type /journal → Claude writes summary to daily note
+     ↓
+SessionEnd hook → appends "Session end — HH:MM" timestamp
 ```
 
-The hook injects vault tags and recent daily notes into Claude's context at session start — no manual `vault_info()` needed.
+The plugin bundles four hooks (SessionStart, UserPromptSubmit, PreCompact, SessionEnd), the duckbrain MCP server config, and a `/journal` slash command. No manual `settings.json` editing.
 
-#### SessionEnd hook (optional — auto-journal)
+#### Manual wiring (advanced)
 
-Auto-stamp session end in today's daily note:
-
-```bash
-curl -o ~/.claude/hooks/vault-journal.sh \
-  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/claude-vault-journal.sh
-chmod +x ~/.claude/hooks/vault-journal.sh
-```
-
-Add to `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/full/path/to/.claude/hooks/vault-journal.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Appends `## Session end — HH:MM` to today's daily note when the session ends.
-
-Restart Claude Code.
+If you prefer wiring hooks yourself without the plugin, the standalone scripts in `scripts/claude-vault-*.sh` still work — see the comments in each file for the required `settings.json` entries.
 
 ---
 
