@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "duckbrain": {
+      "command": "duckbrain",
+      "env": {
+        "VAULT_PATH": "${user_config.vault_path}"
+      }
+    }
+  }
+}
