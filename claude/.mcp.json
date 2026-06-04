@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "duckbrain": {
-      "command": "duckbrain",
+      "command": "uvx",
+      "args": ["duckbrain"],
       "env": {
         "VAULT_PATH": "${user_config.vault_path}"
       }

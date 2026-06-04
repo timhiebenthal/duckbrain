@@ -67,7 +67,7 @@ Restart OpenCode. The plugin gives your AI automatic vault awareness and a few u
 
 ### Claude Code
 
-**Prerequisite:** `pip install duckbrain` (puts the `duckbrain` MCP server on your PATH)
+**Prerequisite:** `uv` or `uvx` on your PATH — the plugin runs the MCP server via `uvx duckbrain` (no manual `pip install` needed; uvx fetches and caches it automatically)
 
 #### Install via plugin marketplace
 
