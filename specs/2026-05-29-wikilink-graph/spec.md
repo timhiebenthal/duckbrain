@@ -4,7 +4,8 @@
 
 Extract `[[wikilinks]]` from vault page bodies during scanning and expose them as
 first-class navigational data. Adds backlink discovery (Obsidian's "what links
-here?"), outgoing link listing, and optional link-based search ranking boost.
+here?") and outgoing link listing. This also creates the metadata needed for a
+future link-based search ranking boost.
 
 The vault already contains explicit link structure — pages like `Recall` link to
 `[[Agent Memory Systems]]`, `DuckBrain` links to `[[OpenCode]]`. DuckBrain currently
@@ -17,7 +18,8 @@ treats these as opaque body text. This spec makes the link graph queryable.
 1. **Wikilink extraction**: During `scan_vault()`, parse `[[wikilinks]]` from body
    text and store them in a new `links: list[str]` field on `PageMetadata`.
 2. **Links column in DuckDB**: The indexer stores links as a comma-separated
-   `VARCHAR` column (same pattern as `tags`).
+   `VARCHAR` column (same pattern as `tags`) and backlink queries use exact
+   comma-delimited membership, not substring matching.
 3. **`vault_backlinks(title)` tool**: Returns all pages whose outgoing links
    include the given title — "what links here?"
 4. **`vault_links(title)` tool**: Returns outgoing links from a specific page —
@@ -40,7 +42,8 @@ treats these as opaque body text. This spec makes the link graph queryable.
 - **Backward compatible** — `PageMetadata.links` defaults to `[]`; existing
   tests unaffected
 - **Performance** — regex applied once per page during scan; backlinks resolved
-  via SQL `LIKE` on comma-separated column; O(n) for < 1000 pages is negligible
+  via SQL membership checks on the comma-separated column; O(n) for < 1000
+  pages is negligible
 
 ## Scope
 
@@ -53,6 +56,7 @@ treats these as opaque body text. This spec makes the link graph queryable.
 - New tool: `vault_links` (`tools/vault_links.py`)
 - Augment `vault_read` to return outgoing `links` alongside body
 - Register new tools in `server.py`
+- Update README Tools section with `vault_backlinks` and `vault_links`
 - Tests for extraction, backlinks query, links query, read integration
 
 ### Out of Scope
@@ -99,38 +103,50 @@ pass to `PageMetadata(links=links)`.
 
 **3. Indexer integration** (`indexer.py`, `build_fts_index()`):
 
-Add `links VARCHAR` column to the pages table. Insert as comma-separated string
-(same as `tags`). The existing FTS index on `'title', 'tags', 'body'` does not
-need to include `links` — links are navigational metadata, not searchable content.
+Add `links VARCHAR` column to the pages table. Insert as a comma-separated
+string (same as `tags`). The existing FTS index on `'title', 'tags', 'body'`
+does not need to include `links` — links are navigational metadata, not
+searchable content.
 
 **4. Backlinks query** (`tools/vault_backlinks.py`):
 
 ```python
 def get_backlinks(conn, title: str) -> list[dict]:
-    """Return pages whose links column contains *title*."""
+    """Return pages whose outgoing links include *title* exactly."""
     sql = """
         SELECT title, kind, filepath,
                COALESCE(substr(body, 1, 150) || CASE WHEN length(body) > 150 THEN '...' ELSE '' END, '') AS snippet,
                created, updated
         FROM pages
-        WHERE links LIKE $title_pattern
+        WHERE list_contains(string_split(links, ','), $title)
         ORDER BY title
     """
-    # Use LIKE with word-boundary-aware matching:
-    #   links = 'Agent Memory Systems,DuckBrain,Graphify'
-    #   WHERE links LIKE '%Agent Memory Systems%'
 ```
 
-Edge case: `title = "AI"` would match `"AI"` within `"AID"`. Mitigation: since
-links are stored comma-separated, we can use boundaries: `LIKE '%,AI,%' OR LIKE
-'AI,%' OR LIKE '%,AI'`. Or accept the minor false-positive risk for simplicity
-and document the limitation.
+Use exact membership over `string_split(links, ',')` instead of a broad
+`LIKE '%title%'` predicate. This avoids false positives such as `title = "AI"`
+matching `"AID"` and avoids wildcard escaping issues for titles containing `%`
+or `_`.
 
 **5. `vault_read` augmentation** (`tools/vault_read.py`):
 
-After reading a page, also query backlinks from the same DB connection and
-include both `links` (from the page's own links column) and `backlinks` (from
-the backlinks query) in the response.
+Include outgoing `links` only. Backlinks stay behind the separate
+`vault_backlinks(title)` tool because computing them requires scanning/indexing
+the full vault.
+
+- For `vault_read(title=...)`, use the `PageMetadata.links` collected by
+  `scan_vault()`.
+- For `vault_read(filepath=...)`, preserve the current direct-file fast path:
+  parse frontmatter/body from the file, infer the title, and call
+  `extract_wikilinks(body, title)` directly. Do not build the full index just to
+  return outgoing links.
+
+**6. `vault_links` query** (`tools/vault_links.py`):
+
+`handle_vault_links(vault_path, title)` scans the vault, finds the page by
+case-insensitive title, and returns its `PageMetadata.links`. Missing pages
+return an `error` dict or an empty result consistently with existing tool style;
+prefer the existing `vault_read` pattern: `{"error": "Page not found: ..."}`.
 
 ### Files Changed
 
@@ -143,10 +159,11 @@ the backlinks query) in the response.
 | `src/duckbrain/tools/vault_links.py` | **New** — `handle_vault_links()` |
 | `src/duckbrain/tools/vault_read.py` | Include outgoing `links` in result |
 | `src/duckbrain/server.py` | Register `vault_backlinks` and `vault_links` tools |
+| `README.md` | Document `vault_backlinks` and `vault_links` in the Tools section |
 | `tests/test_scanner.py` | Test wikilink extraction |
 | `tests/test_vault_backlinks.py` | **New** — test backlink queries |
 | `tests/test_vault_links.py` | **New** — test outgoing link queries |
-| `tests/test_vault_read.py` | Test augmented read with outgoing links |
+| `tests/test_vault_read.py` | Test augmented title and filepath reads with outgoing links |
 | `tests/conftest.py` | Add pages with wikilinks to `temp_vault` |
 
 ### User Experience
@@ -172,7 +189,8 @@ vault_read(title="DuckBrain")
 
 A normalized `edges(source, target)` table would be cleaner for SQL joins, but:
 - DuckDB's FTS extension operates on a single table
-- The vault page count is small (< 500) — `LIKE '%title%'` is fast enough
+- The vault page count is small (< 500) — splitting the comma-separated column
+  at query time is fast enough
 - Keeps implementation simple — one table, no schema changes to FTS
 - Can be migrated to a normalized table later without API changes
 
@@ -190,8 +208,11 @@ A normalized `edges(source, target)` table would be cleaner for SQL joins, but:
 - `[[Page Name]]`, `[[Page|alias]]`, `[[Page#section]]` all extract correctly
 - Self-links and duplicates are filtered
 - `vault_backlinks("NonexistentPage")` returns `[]` (no crash)
+- `vault_backlinks("AI")` does not return pages that only link to `AID`
 - Existing scanner and indexer tests pass unchanged
-- Links are present in `vault_read` output alongside body content
+- Links are present in `vault_read` output alongside body content for both
+  `title` and `filepath` reads
+- README lists `vault_backlinks` and `vault_links`
 
 ## Notes
 
