@@ -509,6 +509,30 @@ def test_write_daily_rejects_bare_date_title(temp_vault: Path) -> None:
     assert not (temp_vault / f"daily/{today}.md").exists()
 
 
+def test_write_daily_ignores_tags(temp_vault: Path) -> None:
+    """Tags passed to a daily write are silently ignored — not written to file.
+
+    Daily notes have no frontmatter and are not indexed by tag; writing
+    inline ``**Tags:** ...`` text is cosmetic noise that misleads callers
+    into thinking tags are functional. The parameter is accepted for
+    backwards compatibility but must produce no output.
+    """
+    from duckbrain.writer import write_page
+
+    result = write_page(
+        str(temp_vault), "daily", "Tag ignore test",
+        "Some body content.",
+        ["foo", "bar", "baz"],
+    )
+    assert result["success"] is True
+    filepath = temp_vault / result["filepath"]
+    content = filepath.read_text()
+    assert "**Tags:**" not in content
+    assert "foo" not in content
+    assert "bar" not in content
+    assert "baz" not in content
+
+
 # ── Daily timestamp guarantee tests (server-side, DRY) ────────────────────────
 #
 # The timestamp on a daily-note heading is a SERVER guarantee, not a

@@ -85,9 +85,10 @@ vault_write(
   kind="daily",
   title="Topic (Category)",
   content="Details and context...",
-  tags=["relevant-tags"]
+  tags=[]
 )
 ```
+Note: `tags` is ignored for `kind="daily"` — daily notes have no frontmatter and are never tag-indexed. Pass `[]` or omit.
 ⚠️ Never pass a bare date as title (e.g. "2026-06-08") — the server auto-stamps a full timestamp heading. Passing the date produces a double-stamped heading. Pass a section name like "Fixed auth bug (Learnings)" instead.
 
 **Wiki concepts** — reusable knowledge worth permanent reference:

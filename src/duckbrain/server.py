@@ -98,7 +98,7 @@ def main() -> None:
             kind: entity | concept | source | synthesis | daily
             title: Page title (or daily section heading)
             content: Markdown body (without frontmatter)
-            tags: List of tag strings
+            tags: List of tag strings (ignored for kind=daily — daily notes are not tag-indexed)
         """
         return handle_vault_write(vault_path, kind, title, content, tags)
 
