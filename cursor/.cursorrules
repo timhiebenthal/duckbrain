@@ -83,11 +83,12 @@ Most important instruction in this file.
 ```
 vault_write(
   kind="daily",
-  title="YYYY-MM-DD",
-  content="## Category — Summary\n\nDetails and context...",
+  title="Topic (Category)",
+  content="Details and context...",
   tags=["relevant-tags"]
 )
 ```
+⚠️ Never pass a bare date as title (e.g. "2026-06-08") — the server auto-stamps a full timestamp heading. Passing the date produces a double-stamped heading. Pass a section name like "Fixed auth bug (Learnings)" instead.
 
 **Wiki concepts** — reusable knowledge worth permanent reference:
 ```
