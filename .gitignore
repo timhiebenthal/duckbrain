@@ -8,3 +8,4 @@ dist/
 .env
 __marimo__/
 node_modules/
+.omc/
