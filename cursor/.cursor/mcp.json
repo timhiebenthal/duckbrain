@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "duckbrain": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/duckbrain", "duckbrain"],
+      "env": {
+        "VAULT_PATH": "/path/to/your/vault"
+      }
+    }
+  }
+}

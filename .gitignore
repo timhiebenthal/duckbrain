@@ -9,3 +9,4 @@ dist/
 __marimo__/
 node_modules/
 .omc/
+.cursor/mcp.json

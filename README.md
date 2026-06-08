@@ -108,81 +108,45 @@ If you prefer wiring hooks yourself without the plugin, the standalone scripts i
 
 ### Cursor
 
-**Disclaimer:** Not tested yet
+Full vault awareness via `.cursorrules` (injected into every system prompt), MCP server, `/journal` slash command, and a SessionEnd hook. See [`cursor/README.md`](cursor/README.md) for complete setup.
 
-Add to `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "duckbrain": {
-      "command": "duckbrain",
-      "env": { "VAULT_PATH": "/path/to/your/vault" }
-    }
-  }
-}
-```
-
-Optionally add `.cursor/rules/duckbrain.mdc` with `alwaysApply: true`:
-
-```yaml
----
-description: DuckBrain vault knowledge base integration
-alwaysApply: true
----
-# DuckBrain vault
-Call vault_info() at session start to discover vault topics.
-Use vault_search() when the query matches vault content.
-```
-
-#### SessionStart hook (prototype — context injection)
-
-> **Prototype** — Cursor's `additional_context` from `sessionStart` hooks has a confirmed bug (dropped due to timing). The `env` output works, but context injection does not yet. Track: [Cursor forum](https://forum.cursor.com/t/sessionstart-hook-additional-context-is-never-injected-into-agents-initial-system-context/158452)
+**Quick setup:**
 
 ```bash
+# 1. Copy .cursorrules to your project root
+cp cursor/.cursorrules /path/to/your/project/.cursorrules
+
+# 2. Copy MCP config to your project
+mkdir -p /path/to/your/project/.cursor
+cp cursor/.cursor/mcp.json /path/to/your/project/.cursor/mcp.json
+# Edit mcp.json: replace /path/to/duckbrain with your actual clone path
+
+# 3. Copy /journal command
+mkdir -p /path/to/your/project/.cursor/commands
+cp cursor/commands/journal.md /path/to/your/project/.cursor/commands/journal.md
+
+# 4. Install SessionEnd hook
 mkdir -p ~/.cursor/hooks/
-curl -o ~/.cursor/hooks/vault-context.sh \
-  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/cursor-vault-context.sh
-chmod +x ~/.cursor/hooks/vault-context.sh
-```
-
-Add to `~/.cursor/hooks.json`:
-
-```json
-{
-  "version": 1,
-  "hooks": {
-    "sessionStart": [
-      { "command": "/full/path/to/.cursor/hooks/vault-context.sh" }
-    ]
-  }
-}
-```
-
-#### SessionEnd hook (auto-journal)
-
-```bash
-curl -o ~/.cursor/hooks/vault-journal.sh \
-  https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/scripts/cursor-vault-journal.sh
+cp cursor/hooks/vault-journal.sh ~/.cursor/hooks/vault-journal.sh
 chmod +x ~/.cursor/hooks/vault-journal.sh
 ```
 
-Add to `~/.cursor/hooks.json`:
+Wire the hook in `~/.cursor/hooks.json`:
 
 ```json
 {
   "version": 1,
   "hooks": {
     "sessionEnd": [
-      { "command": "/full/path/to/.cursor/hooks/vault-journal.sh" }
+      { "command": "/home/youruser/.cursor/hooks/vault-journal.sh" }
     ]
   }
 }
 ```
 
-Appends `## Session end — HH:MM` to today's daily note when a session ends.
+Session flow: `.cursorrules` is injected every turn → AI calls `vault_context()` at session start to load daily notes and search results → guard prompts AI to journal after non-trivial work → `/journal` writes summary → SessionEnd hook appends timestamp.
 
-Restart Cursor.
+Known gaps: no unsolicited journal nudge (no `session.idle` hook in Cursor), no automatic SessionStart injection (the hook is confirmed broken by Cursor devs — `.cursorrules` fills the gap reliably).
 
 ---
 

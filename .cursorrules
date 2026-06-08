@@ -1,3 +1,35 @@
+# DuckBrain Vault Integration
+
+DuckBrain gives you a persistent knowledge vault (Obsidian-backed). Use it to save and retrieve daily session notes, reusable wiki concepts, entity pages, source summaries, and synthesis pages.
+
+## Vault structure
+
+```
+vault/
+├── daily/YYYY-MM-DD.md   — session logs (one file per day, appended)
+├── wiki/                 — permanent knowledge
+│   ├── tags.md           — topic tags (routing signal)
+│   └── log.md            — write log
+```
+
+## Tag routing
+
+Tags tell you which vault topics are relevant to a query.
+- If a vault tag matches the current topic → search vault first before web
+- If no vault tags match → web search is fine; save reusable findings to vault afterward
+
+Get current tags at session start: `vault_read("wiki/tags.md")`
+
+## Session start
+
+At the start of every session, before responding to the user:
+
+1. Call `vault_context(keywords=["<keywords from current task>"])` — derive 2-4 keywords from the user's first message or task description. Returns today's + yesterday's daily notes plus keyword search results. **Keywords are required for search to run** — the server only searches `if include_search and keywords`. Omitting keywords returns dailies only.
+2. Call `vault_read("wiki/tags.md")` — load tag routing signal.
+3. If today's daily note was returned, read it to load prior session context.
+
+---
+
 ## Session Learnings
 
 ### Pre-response learning guard
@@ -28,17 +60,17 @@ Most important instruction in this file.
 ### Session rituals
 
 **Start of session:**
-- Search today's daily: `vault_search("YYYY-MM-DD daily")`
-- Found? Read to load prior context
-- Not found? Skip — /journal command creates it
-- Search related concepts: `vault_search("keywords from task")`
+- Call `vault_context(keywords=["<task keywords>"])` — returns today's + yesterday's daily notes + search results
+- Call `vault_read("wiki/tags.md")` — load tag routing signal
+- Found today's daily? Read it to load prior context
+- Search related concepts: `vault_search("<keywords from task>")`
 
 **During session:**
 - After non-trivial task, append progress to daily note
 - After debugging, write root cause immediately
 - Format: `## HH:MM — What was done`
 
-**End of session (or on "/journal"):**
+**End of session:**
 - Write session summary to daily note
 - Include: Progress, Learnings, Open questions
 - Most important ritual — do not skip

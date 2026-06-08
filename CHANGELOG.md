@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-08
+
+### Added
+
+- **Cursor integration** (`cursor/`): brings Cursor to parity with OpenCode and
+  Claude Code integrations. No plugin system in Cursor — distributed as files to
+  copy into a project.
+
+  - `.cursorrules`: always injected into Cursor's system prompt. Carries the full
+    DuckBrain integration: vault structure + tag routing instructions, session start
+    ritual (call `vault_context(keywords=[...])` + `vault_read("wiki/tags.md")`),
+    pre-response learning guard, and `vault_write` usage guidance. Replaces the
+    broken `SessionStart` hook — `.cursorrules` is more reliable because it
+    survives compaction and session resume natively.
+  - `.cursor/mcp.json`: MCP server wiring template (`uv run --directory`). Note:
+    Cursor does **not** support env var interpolation in this file — `VAULT_PATH`
+    and the `--directory` path must be hardcoded.
+  - `commands/journal.md`: `/journal` slash command — same structure as OpenCode
+    and Claude Code versions.
+  - `hooks/vault-journal.sh`: SessionEnd hook that appends `## Session end — HH:MM`
+    to today's daily note. Implements Cursor's hook stdin/stdout protocol
+    (`read -r INPUT || true` + `echo '{}'`).
+  - `tests/`: 4 bash tests + runner covering all deliverables.
+  - `README.md`: complete setup guide including known gaps (no unsolicited journal
+    nudge, no SessionStart injection) and troubleshooting.
+
+- **`.cursorrules` + `.cursor/commands/journal.md`** committed to repo root for
+  dogfooding — vault awareness when developing duckbrain itself in Cursor.
+  `.cursor/mcp.json` gitignored (contains personal paths).
+
+- **Deprecation notices** on `scripts/cursor-vault-context.sh` and
+  `scripts/cursor-vault-journal.sh` — superseded by `cursor/hooks/vault-journal.sh`
+  and `.cursorrules` respectively.
+
+### Fixed
+
+- **`vault_write` daily title convention** corrected in all LEARNINGS files
+  (`claude/LEARNINGS.md`, `opencode/LEARNINGS.md`, `cursor/.cursorrules`,
+  `.cursorrules`): passing a bare ISO date as `title` (e.g. `"2026-06-08"`)
+  produces a double-stamped heading because the server auto-stamps a full
+  `YYYY-MM-DD HH:MM —` prefix. Pass a section name like `"Topic (Category)"`
+  instead. Confirmed via live test during Cursor integration verification.
+
+### Notes
+
+- **Cursor CLI parity**: Cursor ships a standalone CLI (`cursor` command). Research
+  confirms `.cursorrules`, `.cursor/mcp.json`, and `.cursor/commands/` behave
+  identically in CLI and IDE — the `cursor/` directory works for both.
+- **Quality gates**: `bash cursor/tests/run.sh` 4/4, `uv run pytest` 94/94,
+  `uv run ruff check` clean, `uv run mypy` clean.
+
 ## [0.5.0] - 2026-06-08
 
 ### Added

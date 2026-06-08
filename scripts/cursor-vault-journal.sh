@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# DEPRECATED — use cursor/hooks/vault-journal.sh instead.
+# The new version lives in the cursor/ directory for easier discovery and has tests.
+# Kept as a manual-wiring fallback. See cursor/README.md for setup instructions.
+#
 # Cursor sessionEnd hook — appends session-end timestamp to daily note.
 #
 # Install:
