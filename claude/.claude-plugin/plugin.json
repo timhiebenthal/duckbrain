@@ -1,0 +1,13 @@
+{
+  "name": "duckbrain",
+  "displayName": "DuckBrain",
+  "description": "Obsidian vault awareness for Claude Code — tags, daily notes, and learning capture",
+  "userConfig": {
+    "vault_path": {
+      "type": "directory",
+      "title": "Vault path",
+      "description": "Absolute path to your Obsidian vault (Windows or WSL path accepted)",
+      "required": true
+    }
+  }
+}

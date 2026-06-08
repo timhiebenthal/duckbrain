@@ -1,0 +1,13 @@
+{
+  "name": "duckbrain-local",
+  "description": "DuckBrain plugins for Obsidian vault awareness in Claude Code",
+  "owner": {
+    "name": "timhiebenthal"
+  },
+  "plugins": [
+    {
+      "name": "duckbrain",
+      "source": "./"
+    }
+  ]
+}
