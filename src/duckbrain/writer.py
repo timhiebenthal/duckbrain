@@ -155,7 +155,10 @@ def _write_daily(
         vault_path: Root path of the Obsidian vault.
         title: Section heading for this daily entry.
         content: Markdown body content.
-        tags: List of tag strings.
+        tags: Accepted for API compatibility but ignored — daily notes
+            have no frontmatter and the scanner hardcodes ``tags=[]``
+            for all daily pages, so any tag value would never be indexed,
+            searched, or surfaced in ``vault_info``.
         target_date: Override target date (``YYYY-MM-DD``).  When
             ``None`` (default), uses today's date.
 
@@ -193,10 +196,11 @@ def _write_daily(
     # with a full timestamp prefix, the title is returned unchanged.
     title = _ensure_timestamp_on_heading(title)
 
-    # Build the section body (content + tags)
+    # Build the section body — tags are silently ignored for daily notes:
+    # they have no frontmatter, the scanner hardcodes tags=[] for all
+    # daily pages, so any inline **Tags:** line would be cosmetic noise
+    # that search and vault_info never see.
     entry_body = f"\n\n{content}\n"
-    if tags:
-        entry_body += f"\n**Tags:** {', '.join(tags)}\n"
     heading = f"\n## {title}"
 
     # Create daily directory if needed
