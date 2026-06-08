@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Read session_id from stdin JSON
-session_id=$(jq -r '.session_id // "default"')
+# Read session_id from stdin JSON; sanitize to prevent path traversal in marker path
+session_id=$(jq -r '.session_id // "default"' | tr -dc '[:alnum:]-_')
+session_id="${session_id:-default}"
 
 MARKER="${TMPDIR:-/tmp}/duckbrain-nudge-$session_id"
 

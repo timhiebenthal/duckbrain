@@ -27,7 +27,7 @@ else
 
       echo ""
       echo "$NUDGE"
-    }
+    } | truncate_lines 5000 || true
   )
 fi
 
