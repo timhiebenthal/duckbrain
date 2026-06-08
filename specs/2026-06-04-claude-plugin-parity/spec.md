@@ -43,7 +43,7 @@ All Claude Code plugin mechanics below were verified against the installed `clau
 - New plugin directory: `claude/` at the repo root
   - `claude/.claude-plugin/plugin.json` — manifest with `userConfig` for vault path
   - `claude/.claude-plugin/marketplace.json` — marketplace manifest listing the duckbrain plugin
-  - `claude/.mcp.json` — duckbrain MCP server wiring (`command: "duckbrain"`, reads `${user_config.vault_path}`)
+  - `claude/.mcp.json` — duckbrain MCP server wiring (`command: "uvx"`, `args: ["duckbrain"]`, reads `${user_config.vault_path}`)
   - `claude/hooks/hooks.json` — SessionStart, UserPromptSubmit, PreCompact, SessionEnd registrations
   - `claude/commands/journal.md` — `/journal` slash command
   - `claude/scripts/lib.sh` — shared sourced helper (path resolution, date helpers, safe file reads, line-boundary truncation)
@@ -115,14 +115,15 @@ The vault path reaches hook subprocesses as `CLAUDE_PLUGIN_OPTION_VAULT_PATH` an
 {
   "mcpServers": {
     "duckbrain": {
-      "command": "duckbrain",
+      "command": "uvx",
+      "args": ["duckbrain"],
       "env": { "VAULT_PATH": "${user_config.vault_path}" }
     }
   }
 }
 ```
 
-`command: "duckbrain"` matches the repo's primary documented MCP config (README lines 38, 77, 178) and assumes `pip install duckbrain` (documented as a prerequisite in FR10).
+`command: "uvx"` with `args: ["duckbrain"]` — no separate `pip install` needed; uvx fetches and caches the package automatically (prerequisite: `uv` on PATH, documented in FR10).
 
 **`hooks/hooks.json`:**
 
@@ -195,7 +196,7 @@ SessionEnd hook → appends "Session end — HH:MM" timestamp
 ## Dependencies
 
 - Claude Code version with plugin + marketplace support (verified against the installed CLI: `plugin install`, `plugin marketplace`, `plugin validate` all present)
-- `pip install duckbrain` — the MCP server `command: "duckbrain"` requires the package on PATH (matches README's primary config)
+- `uv` / `uvx` on PATH — the MCP server runs via `uvx duckbrain`; uvx fetches and caches the package automatically (no separate `pip install` needed)
 - `jq` — for hook JSON construction and tests
 - `wslpath` on WSL2; sed fallback elsewhere
 - Vault directory structure: `wiki/tags.md`, `wiki/log.md`, `daily/YYYY-MM-DD.md`
