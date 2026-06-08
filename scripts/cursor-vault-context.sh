@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# DEPRECATED — use cursor/.cursorrules instead.
+# Cursor's SessionStart hook (the event this script targets) has a confirmed bug:
+# additional_context is never injected into the session. This script is kept as a
+# manual-wiring fallback. The recommended integration is cursor/.cursorrules —
+# copy it to your project root for automatic vault awareness.
+# See cursor/README.md for setup instructions.
+#
 # Cursor sessionStart hook — injects DuckBrain vault context.
 #
 # Cursor hooks communicate via JSON on stdin/stdout.

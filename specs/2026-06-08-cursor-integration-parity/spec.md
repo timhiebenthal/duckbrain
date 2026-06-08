@@ -95,18 +95,19 @@ This is the centerpiece. Since SessionStart hooks are broken, and Cursor has no 
 
 Content sections (in injection order — guard first, same priority as Claude Code's SessionStart):
 
-1. **`<vault-context>` block — Tags + Learnings Ritual**: Mirror of OpenCode's tier-1 injection. Full tag list (routing signal), vault learnings ritual (when to save, triggers, format), timestamp guarantee note. This is the "always injected" content — same size as OpenCode's per-call injection (~2K chars tags + ~4K chars ritual instructions).
+1. **`<vault-context>` block — Vault structure + tool routing**: Explains the vault directory layout (`wiki/`, `daily/`), when to use vault tools vs. web search (tag-routing signal), and how to retrieve tags at session start via `vault_read("wiki/tags.md")`. Does NOT contain hardcoded tag data — the AI reads tags live via `vault_read`. This keeps the block small (~1K chars) and always up-to-date.
 
-2. **`<vault-session> block — Session Start Instructions**: Tells the AI to begin every session by calling `vault_context()` to get today's + yesterday's daily notes and keyword search. Unlike hook-based injection which happens automatically, the AI must be instructed to make the call. This is a model behavior instruction, not a context push.
+2. **`<vault-session>` block — Session start instructions**: Tells the AI to begin every session by calling `vault_context(keywords=["<keywords from current task>"])` to get today's + yesterday's daily notes and keyword search results. The `keywords` parameter must be derived from the user's first message or task description — omitting keywords disables search (the server only searches `if include_search and keywords`). Also instructs the AI to call `vault_read("wiki/tags.md")` for tag routing. Unlike hook-based injection which happens automatically, the AI must be instructed to make these calls. This is a model behavior instruction, not a context push.
 
 3. **Pre-response learning guard**: Checklist, trigger table, session rituals — same content as `opencode/LEARNINGS.md` and `claude/LEARNINGS.md`.
 
-4. **Vault tool usage guidance**: When to use vault tools vs. web search, vault_search-first-before-write pattern, daily note structure, caveman-concise style.
+4. **Vault tool usage guidance**: vault_search-first-before-write pattern, daily note structure (server stamps HH:MM — model writes content), caveman-concise style.
 
 Design decisions:
 - **Why one file, not split?** Cursor injects `.cursorrules` as a single block. There's no mechanism to reference external instruction files (unlike OpenCode's `instructions` array in `opencode.json`). Splitting content into multiple files would require Cursor-specific `.cursor/rules/*.mdc` patterns with `globs` — but `.cursorrules` is simpler, more portable, and the single-file approach has been battle-tested (OpenCode's ritual block is also one block in `system.transform`).
-- **Why tags + ritual always?** The tags block is ~2K chars. The LEARNINGS guard is ~4K chars. Together they're ~6K — well within reasonable system prompt overhead. OpenCode's tier-1 injection is also ~6K on every call. Cursor injects this into every turn, same effective cost.
-- **Why session context as an instruction, not injected data?** Cursor has no SessionStart hook that works. The alternative is telling the AI to call `vault_context()` at session start — this is actually how OpenCode's `system.transform` tier-2 injection works conceptually (the plugin pushes context, but the AI still decides what to do with it). With `.cursorrules`, the AI has the same information (here's what `vault_context` returns, use it) but must make the call itself. This is acceptable — search-first-before-action is a core principle of the vault workflow.
+- **Why not hardcode tags?** The tags list changes as the vault grows. Hardcoding it in `.cursorrules` means it goes stale. The AI calling `vault_read("wiki/tags.md")` always gets current tags at the cost of one extra tool call per session start — acceptable.
+- **Why ~7K target?** `claude/LEARNINGS.md` alone is ~3.5K. Adding vault context block (~1K) + session start instructions (~1K) + tool usage guidance (~1K) reaches ~6.5-7K. The 8K hard cap is the real constraint; "target ~7K" gives realistic budget. OpenCode's tier-1 injection is ~6K on every call — same order of magnitude.
+- **Why session context as an instruction, not injected data?** Cursor has no SessionStart hook that works. The alternative is telling the AI to call `vault_context()` at session start — this is acceptable. The `keywords` parameter is critical: without it, `vault_context` returns only dailies and no search results (server code: `if include_search and keywords`). The `.cursorrules` instruction must be explicit about deriving keywords from the task.
 
 **`.cursor/mcp.json`:**
 
@@ -117,7 +118,7 @@ Design decisions:
       "command": "uv",
       "args": ["run", "--directory", "/path/to/duckbrain", "duckbrain"],
       "env": {
-        "VAULT_PATH": "${env:VAULT_PATH}"
+        "VAULT_PATH": "/path/to/your/vault"
       }
     }
   }
@@ -126,7 +127,7 @@ Design decisions:
 
 Design decisions:
 - Uses `uv run --directory` with local repo path (same pattern as OpenCode's `opencode.example.json`) — no PyPI dependency. Users who installed via `uv tool install` can change this to `command: "duckbrain"`.
-- `VAULT_PATH` reads from shell environment via `${env:VAULT_PATH}` — same as how `uvx duckbrain` works in Claude Code plugin. Users set `VAULT_PATH` once in `~/.bashrc`.
+- `VAULT_PATH` must be **hardcoded** in the `env` object — Cursor's `.cursor/mcp.json` does not support environment variable interpolation (verified: `${env:VAULT_PATH}` is not resolved; the `env` object requires literal string values only). Both `VAULT_PATH` and `--directory` are user-specific placeholder paths that must be updated at install time. Workarounds exist (`npx envmcp`, shell wrapper scripts) but add complexity; hardcoding is the recommended approach. Document this clearly in `cursor/README.md`.
 - The `--directory` path is a placeholder users must update — documented in README.
 
 **`commands/journal.md`:**
@@ -140,16 +141,18 @@ Same structure as `opencode/commands/journal.md` and `claude/commands/journal.md
 
 Differences from OpenCode version:
 - Uses MCP tool names directly (`vault_search`, `vault_read`, `vault_write`) — no client-specific wrappers
-- No `$ARGUMENTS` pass-through (Cursor command syntax may differ; documented in README if needed)
+- `$ARGUMENTS` pass-through: Cursor command argument substitution syntax is unconfirmed — do not assume `$ARGUMENTS` works. During implementation, verify whether Cursor's `.cursor/commands/` runner substitutes arguments and what the exact syntax is. Document the finding in `cursor/README.md`. Fallback: instruct users to type extra context inline in the message after invoking `/journal`.
 
 **`hooks/vault-journal.sh`:**
 
 Pure bash, independent of `lib.sh` (the Claude plugin's shared library — not needed for one script). Logic:
-1. Read `VAULT_PATH` from environment
-2. If unset, exit 0 (no-op)
+1. Consume stdin via `read -r INPUT` — required by Cursor's hook runner protocol (the runner writes a JSON payload to the hook's stdin; not consuming it can cause the process to hang)
+2. Read `VAULT_PATH` from environment; if unset, emit `{}` and exit 0 (no-op)
 3. Compute today's date and current time
 4. If `$VAULT_PATH/daily/$TODAY.md` exists, append `\n\n## Session end — HH:MM\n`
-5. Exit 0 (SessionEnd output is ignored by Cursor — pure file side-effect)
+5. Emit `{}` to stdout and exit 0 — Cursor's hook runner expects a JSON response even if SessionEnd output is not surfaced to the AI
+
+Newline convention: `\n\n## Session end — HH:MM\n` (two leading newlines for separation, one trailing). Aligns with the existing `scripts/cursor-vault-journal.sh` format.
 
 Replaces `scripts/cursor-vault-journal.sh` — same logic, better structured, lives in the `cursor/` directory for easier discovery.
 
@@ -227,8 +230,10 @@ Next session → .cursorrules re-injected → AI reads guard → calls vault_con
 ## Notes
 
 - **`.cursorrules` vs `.cursor/rules/`**: Cursor recently added support for `.cursor/rules/*.mdc` files with `globs` and `alwaysApply` metadata. This spec uses `.cursorrules` for simplicity — one file, no metadata, works with all Cursor versions. The README can mention `.cursor/rules/` as an alternative for users who prefer project-specific rule files. The content is the same either way.
+- **`.cursorrules` size budget**: `claude/LEARNINGS.md` alone is ~3.5K chars. Adding vault context block (~1K) + session start instructions (~1K) + tool usage guidance (~1K) reaches ~6.5-7K. Target under 8K, budget ~7K. The 8K hard cap in the test is the real constraint — do not assume 6K is achievable while maintaining full parity.
 - **`{env:VAULT_PATH}` in mcp.json**: Cursor supports `${env:VAR}` syntax in `.cursor/mcp.json`. This is the standard Cursor MCP env variable reference — distinct from Claude Code's `${user_config.KEY}` (plugin-level) and OpenCode's `"environment": {"VAULT_PATH": "..."}` (inline). The README must clearly document this.
 - **SessionEnd parity gap**: OpenCode's end-of-session capture is a model re-prompt that writes a full journal. Cursor's SessionEnd hook cannot invoke the model, so it only appends a timestamp. The actual journal write relies on the user typing `/journal`. This is identical to the Claude Code plugin's SessionEnd limitation (documented in the Claude spec's parity-gap note) — not a Cursor-specific defect.
+- **Cursor CLI parity**: Cursor ships a standalone CLI (`cursor` command, installed separately) for terminal agents and CI. Research confirms that `.cursorrules`, `.cursor/mcp.json`, and `.cursor/commands/` behave identically in CLI and IDE — the `cursor/` directory works for both without modification. CLI-specific config (`~/.cursor/cli-config.json`) is out of scope for this spec.
 - **No marketplace/distribution**: Unlike the Claude Code plugin (installed via `claude plugin marketplace`), the Cursor integration is distributed as source files to copy. A future v2 could add a `cursor-setup.sh` script to automate the copy + hooks wiring, but for v1 parity the manual README flow is sufficient and aligns with how OpenCode's integration is distributed.
 - **Dynamic dates**: The `.cursorrules` file uses placeholder text ("today's date") — the AI computes the actual date at runtime via `vault_context()`. The server stamps HH:MM timestamps on writes. No hardcoded dates in the rules file.
 - **WSL path handling**: Not needed in `.cursorrules` (it's just text). Not needed in `vault-journal.sh` — Cursor on Windows runs the agent on WSL, so `VAULT_PATH` is already a WSL path. The Claude plugin's `resolve_vault_path` with `wslpath` is unnecessary here.

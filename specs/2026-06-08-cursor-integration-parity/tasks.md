@@ -21,11 +21,11 @@ Content-file tasks verify at char count / section level, not behavioral.
 
 ## SPRINT 1: Core content files + test infrastructure
 
-Foundation. All four streams are independent files — fully parallel. Content files are tested for shape (exists, valid, sections present, size limit). These tests are deliberately lightweight — the real integration verification happens when a user copies the files into Cursor.
+Foundation. **Begin with Stream D (test runner) — it is the prerequisite for Sprint 2's hook test.** Streams A-C are independent of each other and can run in parallel after D is written. Content files are tested for shape (exists, valid, sections present, size limit). These tests are deliberately lightweight — the real integration verification happens when a user copies the files into Cursor.
 
 ### Stream A: cursor/.cursorrules
 
-- [ ] **Write failing test** `cursor/tests/test_cursorrules.sh`:
+- [x] **Write failing test** `cursor/tests/test_cursorrules.sh`:
   ```bash
   #!/usr/bin/env bash
   set -euo pipefail
@@ -44,19 +44,19 @@ Foundation. All four streams are independent files — fully parallel. Content f
   ! grep -qi "Bun.file" "$F" || { echo "FAIL: OpenCode references must be removed"; exit 1; }
   echo "PASS"
   ```
-- [ ] **Run to verify failure**: `bash cursor/tests/test_cursorrules.sh` → expect FAIL (file missing)
-- [ ] **Write** `cursor/.cursorrules` — single markdown file with these sections, in injection order:
-  1. **`<vault-context>` block**: "## Vault topic tags" section (adapt from OpenCode's `system.transform` vault-context block). The actual tag list is NOT hardcoded — instead, instruct the AI to call `vault_context()` which returns tags. This keeps the file small (~3K chars instruction, not 2K of tags). Include: vault learnings ritual (when to save, triggers, format, timestamp guarantee note), tool usage guidance (when to use vault vs. web search based on tag presence).
-  2. **`<vault-session> block**: Tell the AI to begin every session by calling `vault_context()` with `include_dailies=true` and `include_search=true` plus keyword search terms from the task. This returns today's + yesterday's daily notes and related wiki pages in one call.
+- [x] **Run to verify failure**: `bash cursor/tests/test_cursorrules.sh` → expect FAIL (file missing)
+- [x] **Write** `cursor/.cursorrules` — single markdown file with these sections, in injection order:
+  1. **`<vault-context>` block**: Explains vault directory layout (`wiki/`, `daily/`), when to use vault tools vs. web search (if a vault tag matches the topic, search vault first), and how to retrieve the tag list (`vault_read("wiki/tags.md")`). Do NOT hardcode tag data — the AI reads tags live. Keep this block to ~1K chars.
+  2. **`<vault-session>` block**: Tell the AI to begin every session by: (a) calling `vault_context(keywords=["<keywords from current task>"])` — keywords MUST be derived from the user's first message or task description (omitting keywords disables search: server only searches `if include_search and keywords`); (b) calling `vault_read("wiki/tags.md")` for tag routing. Both calls together replace what the Claude Code SessionStart hook injected automatically.
   3. **Pre-response learning guard**: Checklist, trigger table, session rituals — adapt `claude/LEARNINGS.md` for Cursor. NO references to OpenCode (`Bun.file`, `opencode`, plugin runtime). Use only MCP tool names (`vault_search`, `vault_read`, `vault_write`, `vault_context`, `vault_info`).
   4. **Tool usage guidance**: vault_search-first-before-write pattern, daily note structure (server stamps HH:MM — model writes content, not timestamps), caveman-concise style.
-  Content must be plain markdown (no JSON, no frontmatter). Target ~6K chars. Review against `opencode/LEARNINGS.md` and `claude/LEARNINGS.md` to ensure parity.
-- [ ] **Run to verify pass**: `bash cursor/tests/test_cursorrules.sh` → expect PASS
-- [ ] **Commit**
+  Content must be plain markdown (no JSON, no frontmatter). Target under 8K chars, budget ~7K (`claude/LEARNINGS.md` alone is ~3.5K). Review against `opencode/LEARNINGS.md` and `claude/LEARNINGS.md` to ensure parity.
+- [x] **Run to verify pass**: `bash cursor/tests/test_cursorrules.sh` → expect PASS
+- [x] **Commit**
 
 ### Stream B: cursor/.cursor/mcp.json
 
-- [ ] **Write failing test** `cursor/tests/test_mcp_config.sh`:
+- [x] **Write failing test** `cursor/tests/test_mcp_config.sh`:
   ```bash
   #!/usr/bin/env bash
   set -euo pipefail
@@ -71,8 +71,8 @@ Foundation. All four streams are independent files — fully parallel. Content f
   jq -e '.mcpServers.duckbrain.env.VAULT_PATH // empty' "$F" >/dev/null || { echo "FAIL: VAULT_PATH env"; exit 1; }
   echo "PASS"
   ```
-- [ ] **Run to verify failure**: `bash cursor/tests/test_mcp_config.sh` → expect FAIL
-- [ ] **Write** `cursor/.cursor/mcp.json`:
+- [x] **Run to verify failure**: `bash cursor/tests/test_mcp_config.sh` → expect FAIL
+- [x] **Write** `cursor/.cursor/mcp.json`:
   ```json
   {
     "mcpServers": {
@@ -86,13 +86,13 @@ Foundation. All four streams are independent files — fully parallel. Content f
     }
   }
   ```
-  The `--directory` path is a placeholder users update. Document this in the file as a JSON comment or in the README. Uses `${env:VAULT_PATH}` — Cursor's env variable reference syntax (reads from shell environment, same as `uvx duckbrain` in the Claude Code plugin).
-- [ ] **Run to verify pass**: `bash cursor/tests/test_mcp_config.sh` → expect PASS
-- [ ] **Commit**
+  Both `--directory` and `VAULT_PATH` are hardcoded placeholder strings — Cursor's `.cursor/mcp.json` does not support env var interpolation (verified: `${env:VAULT_PATH}` is not resolved). Users must update both values at install time. Document this clearly in `cursor/README.md` — no env var syntax, no JSON comments.
+- [x] **Run to verify pass**: `bash cursor/tests/test_mcp_config.sh` → expect PASS
+- [x] **Commit**
 
 ### Stream C: cursor/commands/journal.md
 
-- [ ] **Write failing test** `cursor/tests/test_journal_command.sh`:
+- [x] **Write failing test** `cursor/tests/test_journal_command.sh`:
   ```bash
   #!/usr/bin/env bash
   set -euo pipefail
@@ -106,20 +106,20 @@ Foundation. All four streams are independent files — fully parallel. Content f
   grep -qi "open" "$F" || { echo "FAIL: must include Open section"; exit 1; }
   echo "PASS"
   ```
-- [ ] **Run to verify failure**: `bash cursor/tests/test_journal_command.sh` → expect FAIL
-- [ ] **Write** `cursor/commands/journal.md` — adapt `opencode/commands/journal.md` for Cursor:
+- [x] **Run to verify failure**: `bash cursor/tests/test_journal_command.sh` → expect FAIL
+- [x] **Write** `cursor/commands/journal.md` — adapt `opencode/commands/journal.md` for Cursor:
   1. Review the session (code changes, debugging, decisions, investigations)
   2. Search today's daily note via `vault_search(query="YYYY-MM-DD")`
   3. Write summary via `vault_write(kind="daily", title="YYYY-MM-DD", …)` with Progress/Learnings/Open structure
   4. Check for permanent learnings (create/update wiki concept pages)
   5. Confirm what was saved
-  Use MCP tool names directly (`vault_search`, `vault_read`, `vault_write`, `vault_context`). No `$ARGUMENTS` pass-through (Cursor commands may not support it — test during implementation). Keep caveman-concise instructions.
-- [ ] **Run to verify pass**: `bash cursor/tests/test_journal_command.sh` → expect PASS
-- [ ] **Commit**
+  Use MCP tool names directly (`vault_search`, `vault_read`, `vault_write`, `vault_context`). For `$ARGUMENTS`: do not assume `$ARGUMENTS` works — during implementation, verify whether Cursor's `.cursor/commands/` runner substitutes arguments and what the exact syntax is. Document the finding in `cursor/README.md`. Fallback instruction if unconfirmed: "Type extra context inline in your message after invoking /journal." Keep caveman-concise instructions.
+- [x] **Run to verify pass**: `bash cursor/tests/test_journal_command.sh` → expect PASS
+- [x] **Commit**
 
 ### Stream D: cursor/tests/run.sh
 
-- [ ] **Write** `cursor/tests/run.sh` — runs every `cursor/tests/test_*.sh`, prints per-test PASS/FAIL, exits non-zero if any fail:
+- [x] **Write** `cursor/tests/run.sh` — runs every `cursor/tests/test_*.sh`, prints per-test PASS/FAIL, exits non-zero if any fail:
   ```bash
   #!/usr/bin/env bash
   set -uo pipefail
@@ -136,8 +136,8 @@ Foundation. All four streams are independent files — fully parallel. Content f
   rm -f /tmp/_ctout
   exit $fail
   ```
-- [ ] **Verify runner works** (detects missing test files): `bash cursor/tests/run.sh` → expect FAILs (test files from Streams A-C not yet written, run.sh detects this)
-- [ ] **Commit**
+- [x] **Verify runner works**: `bash cursor/tests/run.sh` → expect all PASS (Streams A-C complete before this verification step runs; the runner correctly executes each test and aggregates results)
+- [x] **Commit**
 
 ---
 
@@ -149,7 +149,7 @@ Single stream — one file, testable bash script with real behavior.
 
 ### Stream A: cursor/hooks/vault-journal.sh  ⚠️ Depends on SPRINT 1 — Stream D
 
-- [ ] **Write failing test** `cursor/tests/test_vault_journal.sh`:
+- [x] **Write failing test** `cursor/tests/test_vault_journal.sh`:
   ```bash
   #!/usr/bin/env bash
   set -euo pipefail
@@ -160,30 +160,35 @@ Single stream — one file, testable bash script with real behavior.
   mkdir -p "$V/daily"
   TODAY=$(date +%Y-%m-%d)
   echo "# existing content" > "$V/daily/$TODAY.md"
-  # Run the hook
-  VAULT_PATH="$V" bash "$ROOT/hooks/vault-journal.sh"
+  # Run the hook — pipe dummy JSON input to satisfy Cursor's hook protocol (stdin consumption)
+  echo '{}' | VAULT_PATH="$V" bash "$ROOT/hooks/vault-journal.sh"
   # Check timestamp was appended
   grep -q "Session end" "$V/daily/$TODAY.md" || { echo "FAIL: timestamp not appended"; exit 1; }
   # Check time format (HH:MM)
   grep -qE "Session end — [0-9][0-9]:[0-9][0-9]" "$V/daily/$TODAY.md" || { echo "FAIL: bad time format"; exit 1; }
   # Check script exits 0 when VAULT_PATH is unset
-  VAULT_PATH="" bash "$ROOT/hooks/vault-journal.sh" >/dev/null 2>&1; [ $? -eq 0 ] || { echo "FAIL: unset-vault exit code"; exit 1; }
+  echo '{}' | VAULT_PATH="" bash "$ROOT/hooks/vault-journal.sh" >/dev/null 2>&1; [ $? -eq 0 ] || { echo "FAIL: unset-vault exit code"; exit 1; }
   # Check script exits 0 when daily note does not exist
   V2=$(mktemp -d /tmp/cursor-test-XXXXXX)
   trap "rm -rf $V2" EXIT
   mkdir -p "$V2/daily"
-  VAULT_PATH="$V2" bash "$ROOT/hooks/vault-journal.sh" >/dev/null 2>&1; [ $? -eq 0 ] || { echo "FAIL: missing-note exit code"; exit 1; }
+  echo '{}' | VAULT_PATH="$V2" bash "$ROOT/hooks/vault-journal.sh" >/dev/null 2>&1; [ $? -eq 0 ] || { echo "FAIL: missing-note exit code"; exit 1; }
   rm -rf "$V2"
   echo "PASS"
   ```
-- [ ] **Run to verify failure**: `bash cursor/tests/test_vault_journal.sh` → expect FAIL
-- [ ] **Write** `cursor/hooks/vault-journal.sh`:
+- [x] **Run to verify failure**: `bash cursor/tests/test_vault_journal.sh` → expect FAIL
+- [x] **Write** `cursor/hooks/vault-journal.sh`:
   ```bash
   #!/usr/bin/env bash
   set -euo pipefail
 
+  # Consume stdin — Cursor's hook runner writes a JSON payload to stdin;
+  # not reading it can cause the process to hang.
+  read -r INPUT || true
+
   VAULT_PATH="${VAULT_PATH:-}"
   if [ -z "$VAULT_PATH" ]; then
+    echo '{}'
     exit 0
   fi
 
@@ -194,11 +199,13 @@ Single stream — one file, testable bash script with real behavior.
   if [ -f "$NOTE" ]; then
     printf "\n\n## Session end — %s\n" "$NOW" >> "$NOTE"
   fi
+
+  echo '{}'
   ```
-  Pure bash, no dependencies. Exits 0 when `VAULT_PATH` unset (no-op). Exits 0 when daily note missing (no-op). Appends `## Session end — HH:MM` timestamp to today's daily note. No `jq`, no `lib.sh`, no WSL path handling (Cursor on Windows runs the agent on WSL, so `VAULT_PATH` is already a WSL path).
-- [ ] **Run to verify pass**: `bash cursor/tests/test_vault_journal.sh` → expect PASS
-- [ ] **chmod +x** `cursor/hooks/vault-journal.sh`
-- [ ] **Commit**
+  Pure bash, no dependencies. Consumes stdin and emits `{}` — required by Cursor's hook runner protocol. Exits 0 when `VAULT_PATH` unset (no-op). Exits 0 when daily note missing (no-op). Appends `\n\n## Session end — HH:MM\n` to today's daily note (two leading newlines for separation from prior content). No `jq`, no `lib.sh`, no WSL path handling (Cursor on Windows runs the agent on WSL, so `VAULT_PATH` is already a WSL path).
+- [x] **Run to verify pass**: `bash cursor/tests/test_vault_journal.sh` → expect PASS
+- [x] **chmod +x** `cursor/hooks/vault-journal.sh`
+- [x] **Commit**
 
 ---
 
@@ -207,7 +214,7 @@ Single stream — one file, testable bash script with real behavior.
 ⚠️ **Depends on: SPRINT 1 & SPRINT 2 complete.** All streams independent — parallel.
 
 ### Stream A: cursor/README.md  ⚠️ Depends on SPRINT 1 & 2 (full directory layout known)
-- [ ] **Write** `cursor/README.md` — user-facing setup guide. Content:
+- [x] **Write** `cursor/README.md` — user-facing setup guide. Content:
   1. What this directory is (DuckBrain Cursor integration)
   2. Prerequisites: Cursor editor, `uv` on PATH, `VAULT_PATH` set in `~/.bashrc`, Obsidian vault with `wiki/tags.md`, `wiki/log.md`, `daily/YYYY-MM-DD.md`
   3. Step-by-step setup:
@@ -220,10 +227,10 @@ Single stream — one file, testable bash script with real behavior.
   4. Session flow diagram (same as spec: session start → guard → vault_context → journal → SessionEnd)
   5. Known gaps: no automatic journal nudge, no SessionStart injection — AI must call `vault_context()` itself; `.cursorrules` instructions handle this
   6. Alternative: `.cursor/rules/` directory option for Cursor users who prefer `.mdc` files
-- [ ] **Commit**
+- [x] **Commit**
 
 ### Stream B: Deprecation notices in scripts/cursor-vault-context.sh and scripts/cursor-vault-journal.sh
-- [ ] **Edit** `scripts/cursor-vault-context.sh`: add a deprecation comment block after the shebang, before the existing code:
+- [x] **Edit** `scripts/cursor-vault-context.sh`: add a deprecation comment block after the shebang, before the existing code:
   ```bash
   # ⚠️ DEPRECATED — use cursor/.cursorrules instead.
   # Cursor's SessionStart hook (the event this script is wired to) has a known bug:
@@ -233,32 +240,32 @@ Single stream — one file, testable bash script with real behavior.
   # See cursor/README.md for setup instructions.
   ```
   Leave all existing code below the deprecation block untouched.
-- [ ] **Edit** `scripts/cursor-vault-journal.sh`: add a deprecation comment block after the shebang:
+- [x] **Edit** `scripts/cursor-vault-journal.sh`: add a deprecation comment block after the shebang:
   ```bash
   # ⚠️ DEPRECATED — use cursor/hooks/vault-journal.sh instead.
   # The new version lives in the cursor/ directory for easier discovery and has tests.
   # Kept as a manual-wiring fallback. See cursor/README.md for setup instructions.
   ```
   Leave all existing code below the deprecation block untouched.
-- [ ] **Verify**: `head -5 scripts/cursor-vault-context.sh` shows DEPRECATED; `head -5 scripts/cursor-vault-journal.sh` shows DEPRECATED
-- [ ] **Commit**
+- [x] **Verify**: `head -5 scripts/cursor-vault-context.sh` shows DEPRECATED; `head -5 scripts/cursor-vault-journal.sh` shows DEPRECATED
+- [x] **Commit**
 
 ### Stream C: Update top-level README.md
-- [ ] **Edit** top-level `README.md` Cursor section (search for "Cursor" or "cursor" in the file):
+- [x] **Edit** top-level `README.md` Cursor section (search for "Cursor" or "cursor" in the file):
   - If a Cursor section exists, replace it with the new integration content
   - If no Cursor section exists, add one alongside the OpenCode and Claude Code sections
   - Content: brief description of the integration, link to `cursor/README.md` for full setup, note the two hard gaps (no journal nudge, no SessionStart injection), mention `.cursorrules` as the primary mechanism
   - Remove any "prototype" or "not validated" language
-- [ ] **Verify**: `grep -i "cursor" README.md` returns the new section
-- [ ] **Commit**
+- [x] **Verify**: `grep -i "cursor" README.md` returns the new section
+- [x] **Commit**
 
 ### Stream D: Full test suite verification & quality gates
-- [ ] **Run full cursor test suite**: `bash cursor/tests/run.sh` → expect all PASS, exit 0
-- [ ] **Run Python quality gates**: `uv run ruff check src/duckbrain/` → 0 errors
-- [ ] **Run Python quality gates**: `uv run ruff format --check src/duckbrain/` → all formatted
-- [ ] **Run Python quality gates**: `uv run mypy src/duckbrain/` → 0 errors
-- [ ] **Run Python quality gates**: `uv run pytest` → all pass (expect same count as before — no Python changes)
-- [ ] **Verify directory structure**: all 6 files are present and correct:
+- [x] **Run full cursor test suite**: `bash cursor/tests/run.sh` → expect all PASS, exit 0
+- [x] **Run Python quality gates**: `uv run ruff check src/duckbrain/` → 0 errors
+- [x] **Run Python quality gates**: `uv run ruff format --check src/duckbrain/` → all formatted
+- [x] **Run Python quality gates**: `uv run mypy src/duckbrain/` → 0 errors
+- [x] **Run Python quality gates**: `uv run pytest` → all pass (expect same count as before — no Python changes)
+- [x] **Verify directory structure**: all 6 files are present and correct:
   ```
   cursor/.cursorrules
   cursor/.cursor/mcp.json
@@ -271,7 +278,7 @@ Single stream — one file, testable bash script with real behavior.
   cursor/tests/test_journal_command.sh
   cursor/tests/test_vault_journal.sh
   ```
-- [ ] **Commit**
+- [x] **Commit**
 
 ---
 
@@ -296,7 +303,7 @@ SPRINT 1 Stream D (test runner) → SPRINT 2 Stream A (hook script, depends on r
 ## Notes
 
 - **Test framework**: plain bash. No bats/Node/Python deps for cursor tests. Content-file tests verify shape (exists, valid, sections, size). Hook-script test verifies behavior. The Python `pytest`/`ruff`/`mypy` gates run separately in SPRINT 3 Stream D — they should pass without changes since no Python code is modified.
-- **`.cursorrules` size target**: ~6K chars. OpenCode's tier-1 injection is ~6K (2K tags + 4K ritual). The `.cursorrules` test enforces a hard cap of 8K. If the content exceeds 8K, the instruction block must be trimmed (remove redundancy, shorten examples) until it passes.
+- **`.cursorrules` size target**: under 8K chars, budget ~7K. `claude/LEARNINGS.md` alone is ~3.5K; adding vault context block + session start instructions + tool usage guidance reaches ~6.5-7K. The test enforces a hard 8K cap. If content exceeds 8K, trim by removing redundancy and shortening examples — do not drop required sections. The "~6K target" from OpenCode is not achievable here while maintaining full parity.
 - **No shared lib.sh**: `cursor/hooks/vault-journal.sh` is a single self-contained script. No `lib.sh` dependency — unlike the Claude plugin which has 4 scripts sharing path resolution, date helpers, and truncation logic. If future Cursor hooks are added, extract shared helpers then.
 - **No fixtures.sh**: The vault-journal test creates a temp vault inline — one test doesn't justify a shared fixture module. If future tests are added, extract then.
 - **No WSL path handling in hook**: Cursor on Windows runs the agent on WSL2, so `VAULT_PATH` is already a WSL path (`/mnt/c/...`). The hook doesn't need `wslpath` or sed fallbacks. If a user runs Cursor natively on macOS, `VAULT_PATH` is already a POSIX path.
