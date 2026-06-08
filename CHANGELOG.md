@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-08
+
+### Fixed
+
+- **SessionEnd vault spam**: `vault-journal.sh` now skips writing `## Session end`
+  if the last non-empty line in the daily note is already a Session end marker.
+  Prevents duplicate entries when `SessionEnd` fires multiple times per stop
+  (concurrent panes, rapid restarts) and eliminates back-to-back markers from
+  sessions with no meaningful content.
+
 ## [0.6.0] - 2026-06-08
 
 ### Added
