@@ -29,16 +29,6 @@
           }
         ]
       }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/vault-journal.sh"
-          }
-        ]
-      }
     ]
   }
 }
