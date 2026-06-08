@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-08
+
+### Fixed
+
+- **Daily note tags silently ignored**: tags passed to `vault_write(kind="daily")`
+  were written as inline `**Tags:** ...` text but never indexed — `scanner.py`
+  hardcodes `tags=[]` for all daily pages, so they never reached `vault_info`,
+  `vault_search`, or `wiki/tags.md`. The inline noise is now suppressed; the
+  `tags` parameter is still accepted for backwards compatibility but produces no
+  output. AI client instruction files updated accordingly.
+
 ## [0.6.1] - 2026-06-08
 
 ### Fixed
