@@ -1,22 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Cursor SessionEnd hook — intentionally a no-op.
+# Session end markers added noise without signal: with concurrent agent
+# sessions a "Session end" line doesn't contextually belong to any prior
+# entry and just clutters the daily note.
 
 # Consume stdin — Cursor's hook runner writes a JSON payload to stdin;
 # not reading it can cause the process to hang.
 read -r INPUT || true
-
-VAULT_PATH="${VAULT_PATH:-}"
-if [ -z "$VAULT_PATH" ]; then
-  echo '{}'
-  exit 0
-fi
-
-TODAY=$(date +%Y-%m-%d)
-NOW=$(date +%H:%M)
-NOTE="$VAULT_PATH/daily/$TODAY.md"
-
-if [ -f "$NOTE" ]; then
-  printf "\n\n## Session end — %s\n" "$NOW" >> "$NOTE"
-fi
 
 echo '{}'

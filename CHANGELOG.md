@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-06-08
+
+### Fixed
+
+- **Session end markers removed**: `vault-journal.sh` (Claude Code) and
+  `cursor/hooks/vault-journal.sh` (Cursor) are now no-ops. The `## Session end — HH:MM`
+  marker was noise rather than signal — with concurrent agent sessions it has no
+  meaningful relationship to the content before or after it in the daily note.
+  The `SessionEnd` hook entry is also removed from `claude/hooks/hooks.json`.
+  OpenCode's `session.idle` nudge (which prompts the model to journal rather than
+  writing a raw marker) is unaffected.
+
 ## [0.6.2] - 2026-06-08
 
 ### Fixed
