@@ -4,7 +4,7 @@ set -euo pipefail
 
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib.sh"
 
-VAULT=$(resolve_vault_path "${CLAUDE_PLUGIN_OPTION_VAULT_PATH:-}")
+VAULT=$(resolve_vault_path "${CLAUDE_PLUGIN_OPTION_VAULT_PATH:-${VAULT_PATH:-}}")
 
 NUDGE="Journal checkpoint — vault_write(kind=\"daily\", title=\"$(date +%Y-%m-%d)\", ...) if anything notable this session."
 

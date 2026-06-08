@@ -17,10 +17,11 @@ from duckbrain.writer import build_tags_index
 # Load .env from project root (or current working directory).
 load_dotenv()
 
-# Handle the case where MCP config sets VAULT_PATH to empty string
-# (e.g. OpenCode's {env:VAULT_PATH} when the var is not in shell),
-# which blocks load_dotenv from loading the .env value.
-if os.environ.get("VAULT_PATH", "").strip() == "":
+# If VAULT_PATH is empty or an unresolved template (e.g. "${user_config.vault_path}"
+# when the MCP host doesn't perform substitution), clear it so load_dotenv can supply
+# the real value from a .env file or the shell environment.
+_vp = os.environ.get("VAULT_PATH", "").strip()
+if not _vp or _vp.startswith("${"):
     os.environ.pop("VAULT_PATH", None)
     load_dotenv()
 

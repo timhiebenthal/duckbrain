@@ -4,7 +4,7 @@ set -euo pipefail
 
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib.sh"
 
-VAULT=$(resolve_vault_path "${CLAUDE_PLUGIN_OPTION_VAULT_PATH:-}")
+VAULT=$(resolve_vault_path "${CLAUDE_PLUGIN_OPTION_VAULT_PATH:-${VAULT_PATH:-}}")
 if [ -z "$VAULT" ]; then
   exit 0
 fi
@@ -39,4 +39,4 @@ fi
   echo ""
   tail_lines "$VAULT/wiki/log.md" 20
 
-} | truncate_lines 9500
+} | truncate_lines 9500 || true

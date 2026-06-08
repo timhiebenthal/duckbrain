@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-08
+
+### Added
+
+- **Claude Code plugin** (`claude/`): self-contained plugin installable via
+  `claude plugin marketplace add` + `claude plugin install duckbrain@duckbrain`.
+  Bundles all hooks, MCP server wiring, and the `/journal` slash command — no
+  manual `settings.json` editing required.
+
+  - `SessionStart` hook (`vault-context.sh`): injects LEARNINGS guard first,
+    then vault topic tags, today's and yesterday's daily notes, and recent log
+    activity. Survives `resume`, `clear`, and `compact`.
+  - `UserPromptSubmit` hook (`vault-nudge.sh`): throttled journal nudge (once
+    per 15-minute window per session, keyed on `session_id`).
+  - `PreCompact` hook (`vault-precompact.sh`): emits a compaction snapshot
+    (recent log tail + today's daily + journal checkpoint) as JSON
+    `additionalContext` so context survives a `/compact`.
+  - `SessionEnd` hook (`vault-journal.sh`): appends `## Session end — HH:MM`
+    timestamp to today's daily note.
+  - `/journal` slash command: triggers end-of-session journal write equivalent
+    to the OpenCode `/journal` command.
+  - `LEARNINGS.md`: learning-guard source injected at session start.
+  - `marketplace.json` + `plugin.json`: enables `claude plugin install` flow
+    with `userConfig` prompt for vault path.
+  - `.mcp.json`: wires the duckbrain MCP server automatically when the plugin
+    is enabled.
+
+### Fixed
+
+- **Hook SIGPIPE with `pipefail`**: `vault-context.sh` pipeline
+  (`{ ... } | truncate_lines 9500`) now appends `|| true` so a SIGPIPE from
+  early truncation no longer causes the hook to exit 141 and show a session
+  error banner.
+- **VAULT_PATH fallback**: all hook scripts now resolve
+  `${CLAUDE_PLUGIN_OPTION_VAULT_PATH:-${VAULT_PATH:-}}`, so the shell
+  `VAULT_PATH` env var (already used by the MCP server) serves as a fallback
+  when the plugin's `userConfig` is not populated.
+
 ## [0.4.1] - 2026-06-01
 
 ### Fixed
