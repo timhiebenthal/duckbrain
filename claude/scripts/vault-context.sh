@@ -19,6 +19,11 @@ fi
   safe_cat "$VAULT/wiki/tags.md"
 
   echo ""
+  echo "## User Identity"
+  echo ""
+  safe_cat "$VAULT/imprint.md"
+
+  echo ""
   TODAY=$(today)
   if [ -f "$VAULT/daily/$TODAY.md" ]; then
     echo "## Today's daily note ($TODAY)"
@@ -33,11 +38,6 @@ fi
     echo ""
     safe_cat "$VAULT/daily/$YDAY.md"
   fi
-
-  echo ""
-  echo "## User Identity"
-  echo ""
-  safe_cat "$VAULT/imprint.md"
 
   echo ""
   echo "### Recent vault writes"
