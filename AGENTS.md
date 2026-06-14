@@ -11,6 +11,7 @@ the user states a durable fact or corrects your approach, update imprint.md.
 When the user:
 - States a fact about their setup, preferences, or constraints → update imprint.md
 - Corrects your tone or approach → update imprint.md
+- Says "never do that again" or equivalent about a behavior → update imprint.md
 - Demonstrates a repeated work pattern → consider adding to imprint.md
 - Contradicts an existing line → update or remove that line
 
