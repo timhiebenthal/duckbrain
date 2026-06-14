@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Cross-platform setup automation**: `setup-duckbrain.sh` (macOS/Linux) and
+  `setup-duckbrain.ps1` (Windows+WSL2) provide one-command DuckBrain installation
+  with Claude Desktop configuration. Includes `docs/setup-guide.md` and
+  `docs/troubleshooting.md` for end-user documentation.
+  - Interactive prompts with smart defaults (auto-detects vault paths, WSL usernames)
+  - Prerequisite checking (uv, Claude Desktop, WSL2)
+  - Local repo install with PyPI fallback
+  - Claude Desktop config updates with backup/restore
+  - JSON validation before writing config
+  - Idempotent — safe to re-run
+  - `--uninstall` flag for clean removal
+  - Windows: creates WSL launch script + batch file bridge
+  - Windows: dynamic Claude config path detection (no hardcoded package folder)
+
 ## [0.6.3] - 2026-06-08
 
 ### Fixed

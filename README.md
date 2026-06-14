@@ -8,13 +8,30 @@ DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read
 
 ## Installation
 
-Install DuckBrain:
+### Quick Setup (Recommended)
 
+Use the platform-specific setup script for one-command installation with Claude Desktop:
+
+**macOS / Linux:**
 ```bash
-pip install duckbrain
+curl -O https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/setup-duckbrain.sh
+bash setup-duckbrain.sh
 ```
 
-... or with the dependency manager of your choice (uv, poetry, ...)
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/setup-duckbrain.ps1" -OutFile "setup-duckbrain.ps1"
+.\setup-duckbrain.ps1
+```
+
+The script installs DuckBrain, configures Claude Desktop, validates everything, and
+is safe to run multiple times. See the [Setup Guide](docs/setup-guide.md) for details.
+
+### Manual Install
+
+```bash
+uv tool install duckbrain
+```
 
 Then pick your agent:
 
@@ -193,6 +210,41 @@ Restart Hermes.
 
 ---
 
+## HTTP Mode
+
+Optionally run DuckBrain as an HTTP server instead of stdio. This lets Claude Desktop and claude.ai web users connect via Settings → Connectors → Add custom connector — no `claude_desktop_config.json` editing needed.
+
+```bash
+# Terminal (foreground)
+duckbrain --http
+# → Uvicorn running on http://127.0.0.1:8000 (CTRL+C to stop)
+
+# Custom port
+duckbrain --http --port 9000
+```
+
+**Setup flow:**
+
+1. `pip install duckbrain`
+2. `duckbrain --http`          # starts server on localhost:8000/mcp
+3. Open Claude Desktop/Web → Settings → Connectors → Add custom connector
+4. Enter URL: `http://localhost:8000/mcp`
+5. DuckBrain tools appear in your Claude session
+
+**Background process options:**
+- Terminal foreground: `duckbrain --http`
+- Terminal background: `duckbrain --http &`
+- systemd user service: `~/.config/systemd/user/duckbrain.service`
+- macOS launchd: `~/Library/LaunchAgents/duckbrain.plist`
+
+**Security:** Default host is `127.0.0.1` — not accessible from other machines on the network. FastMCP has built-in DNS rebinding protection for localhost.
+
+**Troubleshooting:**
+- Port in use? Use `--port` to specify a different port.
+- Need network access? Use `--host 0.0.0.0` (opens to all interfaces — use with caution).
+
+---
+
 ## Vault Schema
 
 ```
@@ -233,15 +285,15 @@ Implementation internals — not needed for installation.
 ┌──────────────────────────────────────────────────────────────┐
 │                      AI Agent                                │
 │  ┌──────────────────────────┐  ┌──────────────────────────┐  │
-│  │ MCP Client (stdio)       │  │ Hooks / Plugins          │  │
-│  │  vault_search,           │  │ (SessionStart, system    │  │
-│  │  vault_read, vault_write │  │  transform — inject      │  │
-│  │  vault_context, vault_info│  │  vault context into      │  │
-│  │                          │  │  system prompt)          │  │
+│  │ MCP Client (stdio)       │  │ MCP Client (streamable-HTTP)│  │
+│  │  vault_search,           │  │ (Settings → Connectors)   │  │
+│  │  vault_read, vault_write │  │  http://localhost:8000/mcp│  │
+│  │  vault_context, vault_info│  │                           │  │
+│  │                          │  │ Hooks / Plugins          │  │
 │  └──────────┬───────────────┘  └──────────┬───────────────┘  │
 └─────────────│──────────────────────────────│──────────────────┘
-              │ MCP stdio                    │ reads directly
-              ▼                              ▼ from vault
+              │ MCP stdio                    │ HTTP
+              ▼                              ▼
 ┌──────────────────────────────┐  ┌──────────────────────────────┐
 │  DuckBrain MCP Server        │  │ Side channel:                │
 │  vault_info   ──► DuckDB FTS │  │  wiki/tags.md                │
