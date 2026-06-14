@@ -23,6 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Windows: creates WSL launch script + batch file bridge
   - Windows: dynamic Claude config path detection (no hardcoded package folder)
 
+- **imprint.md — AI-maintained identity document**: Single markdown file at vault
+  root (`imprint.md`) capturing the user's durable identity — environment,
+  communication preferences, work patterns, technical domains, and project values.
+  Every connected agent reads it at session start and maintains it via conversation
+  triggers. Wired into all four agent pipelines:
+  - OpenCode: injected as `<vault-identity>` block in system prompt plugin
+  - Claude Code: injected as `## User Identity` section in SessionStart hook
+  - Cursor: instructions in `.cursorrules` to read + maintain
+  - Hermes: instructions in `AGENTS.md` to read + maintain
+  - Seed file created at vault root with initial identity content
+
 ## [0.6.3] - 2026-06-08
 
 ### Fixed
