@@ -35,6 +35,11 @@ fi
   fi
 
   echo ""
+  echo "## User Identity"
+  echo ""
+  safe_cat "$VAULT/imprint.md"
+
+  echo ""
   echo "### Recent vault writes"
   echo ""
   tail_lines "$VAULT/wiki/log.md" 20
