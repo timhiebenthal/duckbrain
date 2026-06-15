@@ -4,6 +4,10 @@ Read `<vault_root>/imprint.md` at session start to learn communication preferenc
 environment, work patterns, and technical domains. Adjust your tone and approach
 accordingly. If the user states a durable fact about themselves, update imprint.md.
 
+If `imprint.md` doesn't exist, create it on first session with what you know:
+OS, shell, editor, profession, project context, communication preferences inferred
+from the user's first messages.
+
 ### imprint.md maintenance
 
 When the user:

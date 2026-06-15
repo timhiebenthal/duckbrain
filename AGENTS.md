@@ -6,6 +6,10 @@ Read `<vault_root>/imprint.md` at session start — contains communication
 preferences, environment details, and work patterns. Maintain it: when
 the user states a durable fact or corrects your approach, update imprint.md.
 
+If `imprint.md` doesn't exist, create it on first session with what you know:
+OS, shell, editor, profession, project context, communication preferences inferred
+from the user's first messages.
+
 ### imprint.md maintenance
 
 When the user:
