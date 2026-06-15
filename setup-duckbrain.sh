@@ -55,6 +55,12 @@ die() {
 # ── Detect platform ──────────────────────────────────────────────────────────
 
 detect_os() {
+    # Check for WSL2 first (highest priority)
+    if [[ "$(uname -r)" == *microsoft* ]] || [[ -f /proc/version && $(grep -i microsoft /proc/version) ]]; then
+        echo "wsl2"
+        return
+    fi
+
     case "$(uname -s)" in
         Darwin*)  echo "macos" ;;
         Linux*)   echo "linux" ;;
@@ -67,6 +73,20 @@ detect_config_path() {
     case "$os" in
         macos) echo "${HOME}/Library/Application Support/Claude/claude_desktop_config.json" ;;
         linux) echo "${HOME}/.config/Claude/claude_desktop_config.json" ;;
+        wsl2)
+            warn "WSL2 detected. Claude Desktop on Windows uses a different config path."
+            warn "This script is for native Linux/macOS only."
+            warn "For WSL2, use the PowerShell script: setup-duckbrain.ps1"
+            echo ""
+            echo "Would you like to:"
+            echo "  1. Continue with native Linux config (will likely fail)"
+            echo "  2. Exit and use the PowerShell script (recommended)"
+            read -r -p "Choice [1/2]: " choice
+            if [[ "$choice" == "2" ]]; then
+                die "Please use setup-duckbrain.ps1 for WSL2. See docs/setup-guide.md"
+            fi
+            echo "${HOME}/.config/Claude/claude_desktop_config.json"
+            ;;
         *)     echo "" ;;
     esac
 }
@@ -92,6 +112,11 @@ check_claude_desktop() {
     local os="$1"
     local config_path
     config_path="$(detect_config_path "$os")"
+
+    if [[ "$os" == "wsl2" ]]; then
+        # WSL2 is handled in detect_config_path — user already warned/redirected
+        return 1
+    fi
 
     if [[ "$os" == "macos" ]]; then
         if [[ -d "/Applications/Claude.app" ]] || [[ -d "${HOME}/Applications/Claude.app" ]]; then
@@ -523,6 +548,27 @@ main() {
 
     if [[ "$os" == "unknown" ]]; then
         die "Unsupported operating system: $(uname -s). This script supports macOS and Linux."
+    fi
+
+    # Early WSL2 guidance
+    if [[ "$os" == "wsl2" ]]; then
+        warn "You appear to be running inside WSL2."
+        warn ""
+        warn "  WSL2 users should use the PowerShell script instead:"
+        warn "    setup-duckbrain.ps1"
+        warn ""
+        warn "  The PowerShell script handles the Windows ↔ WSL bridge"
+        warn "  (batch files, Windows config path, etc.) automatically."
+        warn ""
+        warn "  See docs/setup-guide.md for details."
+        echo ""
+        echo "Continue anyway with native Linux-style setup? [y/N]"
+        read -r -n1 response
+        echo ""
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            die "Please use setup-duckbrain.ps1 for WSL2. Exiting."
+        fi
+        warn "Continuing with Linux-style setup — Claude Desktop integration will likely fail."
     fi
 
     # ── Uninstall mode ─────────────────────────────────────────────────────

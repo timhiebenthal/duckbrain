@@ -24,9 +24,28 @@ Before you start, make sure you have:
 > **New to uv?** It's a fast Python package manager. The one-liner above installs
 > it. No admin rights needed.
 
+## Which Script Do I Need?
+
+| Platform | Script | Notes |
+|----------|--------|-------|
+| macOS (any version) | `setup-duckbrain.sh` | Native Unix, no WSL |
+| Native Linux (Ubuntu, Fedora, etc.) | `setup-duckbrain.sh` | Running Linux as your main OS |
+| Windows 10/11 with WSL2 | `setup-duckbrain.ps1` | **Not the bash script!** |
+| Windows (no WSL) | Not supported | Install WSL2 first |
+
 ---
 
 ## Quick Start
+
+> **⚠️ If you're on Windows with WSL2, use the PowerShell script — NOT the bash script.**
+>
+> The bash script is for **native Linux** only. WSL2 users should download
+> and run `setup-duckbrain.ps1` instead.
+>
+> **How to tell:**
+> - **WSL2:** You're on Windows but using a Linux terminal inside WSL
+> - **Native Linux:** You're running Linux as your main OS (Ubuntu, Fedora, etc.)
+> - **macOS:** You're on a Mac
 
 ### macOS
 

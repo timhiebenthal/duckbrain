@@ -326,11 +326,47 @@ function Update-ClaudeConfig {
         $configHash['mcpServers'] = @{}
     }
 
-    # Add duckbrain entry
-    $configHash['mcpServers']['duckbrain'] = @{
-        'command' = $Command
-        'env' = @{
-            'VAULT_PATH' = $VaultPath
+    # Check for existing duckbrain entry
+    $existingEntry = $configHash['mcpServers']['duckbrain']
+    if ($existingEntry) {
+        $oldCommand = $existingEntry.command
+        Write-Warn "Found existing duckbrain entry in config."
+        Write-Host "  Old command: $oldCommand" -ForegroundColor Gray
+        Write-Host "  New command: $Command" -ForegroundColor Gray
+        if ($oldCommand -ne $Command) {
+            Write-Host "  (Command changed)" -ForegroundColor Yellow
+        }
+
+        # Preserve any existing fields not being overwritten
+        $mergedEntry = @{
+            'command' = $Command
+            'env' = @{
+                'VAULT_PATH' = $VaultPath
+            }
+        }
+        # Carry forward any extra top-level fields from existing entry
+        foreach ($prop in $existingEntry.PSObject.Properties) {
+            if ($prop.Name -notin @('command', 'env')) {
+                $mergedEntry[$prop.Name] = $prop.Value
+            }
+        }
+        # Carry forward any extra env vars from existing entry
+        if ($existingEntry.env) {
+            foreach ($envProp in $existingEntry.env.PSObject.Properties) {
+                if ($envProp.Name -ne 'VAULT_PATH') {
+                    $mergedEntry['env'][$envProp.Name] = $envProp.Value
+                }
+            }
+        }
+        $configHash['mcpServers']['duckbrain'] = $mergedEntry
+        Write-Host "  Existing custom fields preserved." -ForegroundColor Gray
+    } else {
+        # Add fresh duckbrain entry
+        $configHash['mcpServers']['duckbrain'] = @{
+            'command' = $Command
+            'env' = @{
+                'VAULT_PATH' = $VaultPath
+            }
         }
     }
 
@@ -356,6 +392,20 @@ function Update-ClaudeConfig {
 }
 
 # ── WSL script creation ────────────────────────────────────────────────────
+function Resolve-DuckBrainPath {
+    param([string]$WslUser)
+    # Try to resolve duckbrain's actual location inside WSL
+    $result = wsl.exe -e bash -c "command -v duckbrain 2>/dev/null || true" 2>$null
+    if ($result) {
+        Write-Info "DuckBrain binary resolved at: $result"
+        return $result.Trim()
+    }
+    # Fallback to default uv tool install location
+    $defaultPath = "/home/$WslUser/.local/bin/duckbrain"
+    Write-Warn "DuckBrain not on WSL PATH — using default path: $defaultPath"
+    return $defaultPath
+}
+
 function New-WslScript {
     param(
         [string]$WslUser,
@@ -364,6 +414,9 @@ function New-WslScript {
     )
 
     Write-Step "Creating WSL launch script"
+
+    # Resolve the actual duckbrain binary path
+    $duckbrainBin = Resolve-DuckBrainPath -WslUser $WslUser
 
     $scriptContent = @"#!/usr/bin/env bash
 # ============================================================================
@@ -374,7 +427,7 @@ function New-WslScript {
 # ============================================================================
 set -euo pipefail
 export VAULT_PATH="${WslVaultPath}"
-exec /home/${WslUser}/.local/bin/duckbrain
+exec "${duckbrainBin}"
 "@
 
     # Write to a temp file, then copy to WSL
@@ -460,6 +513,18 @@ function Install-DuckBrain {
     param([string]$RepoPath)
 
     Write-Step "Installing DuckBrain in WSL"
+
+    # Check if duckbrain is already installed
+    $existingPath = wsl.exe -e bash -c "command -v duckbrain 2>/dev/null || true" 2>$null
+    if ($existingPath) {
+        Write-Info "DuckBrain already installed at: $($existingPath.Trim())"
+        $reinstall = Read-Host "Reinstall? (y/N)"
+        if ($reinstall -ne 'y') {
+            Write-Host "  Skipping install." -ForegroundColor Gray
+            return $true
+        }
+        Write-Host "  Proceeding with reinstall..." -ForegroundColor Gray
+    }
 
     if ($RepoPath -and (Test-Path $RepoPath)) {
         Write-Host "  Installing from local repository: $RepoPath" -ForegroundColor Gray

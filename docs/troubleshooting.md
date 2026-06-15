@@ -307,6 +307,48 @@ that Claude Desktop might hide.
 
 ---
 
+### DuckBrain installed but script can't find it
+
+**Symptom:** The setup script or WSL launch script can't find the `duckbrain`
+binary, even though you have it installed via `pip`, `pyenv`, `conda`, or another
+method.
+
+**Check where DuckBrain is installed:**
+
+```bash
+# In WSL:
+wsl -e bash -c "command -v duckbrain"
+
+# In macOS/Linux:
+which duckbrain
+```
+
+**If it's not at `~/.local/bin/duckbrain`:**
+
+The setup scripts assume DuckBrain is installed via `uv tool install`, which
+places the binary at `~/.local/bin/duckbrain`. If you used a different method,
+the generated WSL launch script may point to the wrong path.
+
+**Options to fix:**
+
+- **Option A (recommended):** Reinstall via `uv tool install duckbrain`:
+  ```bash
+  uv tool install duckbrain
+  ```
+  This ensures the binary is at the expected location and works with the
+  auto-generated scripts.
+
+- **Option B:** Manually update the WSL launch script
+  (`~/bin/duckbrain-for-claude.sh`) to point to your actual installation path.
+  Look for the `exec` line and change the path accordingly.
+
+- **Option C:** Create a symlink so the script finds duckbrain:
+  ```bash
+  ln -sf "$(which duckbrain)" ~/.local/bin/duckbrain
+  ```
+
+---
+
 ### How to check if DuckBrain is running
 
 **macOS / Linux:**
