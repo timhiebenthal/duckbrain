@@ -569,6 +569,7 @@ main() {
             die "Please use setup-duckbrain.ps1 for WSL2. Exiting."
         fi
         warn "Continuing with Linux-style setup — Claude Desktop integration will likely fail."
+        os="linux"  # Remap to linux to avoid duplicate prompt and silent exit in check_claude_desktop
     fi
 
     # ── Uninstall mode ─────────────────────────────────────────────────────
