@@ -1,3 +1,26 @@
+## User Identity
+
+Read `<vault_root>/imprint.md` at session start to learn communication preferences,
+environment, work patterns, and technical domains. Adjust your tone and approach
+accordingly. If the user states a durable fact about themselves, update imprint.md.
+
+If `imprint.md` doesn't exist, create it on first session with what you know:
+OS, shell, editor, profession, project context, communication preferences inferred
+from the user's first messages.
+
+### imprint.md maintenance
+
+When the user:
+- States a fact about their setup, preferences, or constraints → update imprint.md
+- Corrects your tone or approach → update imprint.md
+- Says "never do that again" or equivalent about a behavior → update imprint.md
+- Demonstrates a repeated work pattern → consider adding to imprint.md
+- Contradicts an existing line → update or remove that line
+
+Do NOT add session-specific details (one-off tasks, current bugs). Only durable facts.
+
+---
+
 # DuckBrain Vault Integration
 
 DuckBrain gives you a persistent knowledge vault (Obsidian-backed). Use it to save and retrieve daily session notes, reusable wiki concepts, entity pages, source summaries, and synthesis pages.

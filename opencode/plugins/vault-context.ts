@@ -33,6 +33,7 @@
 
 import type { Plugin } from "@opencode-ai/plugin"
 import {
+  loadIdentity,
   loadTags,
   loadSessionContext,
   loadCompactionSnapshot,
@@ -93,6 +94,18 @@ Cursor, Claude Code, etc.) without each client having to compute the time.
 
 Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
 </vault-context>
+          `.trim())
+        }
+
+        // Identity — always injected (small, like tags). imprint.md at
+        // vault root captures durable user identity — environment,
+        // communication preferences, work patterns, etc.
+        const identity = await loadIdentity(vaultPath)
+        if (identity) {
+          output.system.push(`
+<vault-identity>
+${identity}
+</vault-identity>
           `.trim())
         }
 

@@ -69,6 +69,15 @@ export function yesterdayStr(): string {
 }
 
 /**
+ * Tier 3: Identity — always injected (before session context). Small file
+ * at vault root that captures durable user identity — environment,
+ * communication preferences, work patterns, etc.
+ */
+export async function loadIdentity(vaultPath: string): Promise<string | null> {
+  return safeRead(`${vaultPath}/imprint.md`)
+}
+
+/**
  * Tier 1: Tags — always injected. Small (~2K), provides topic routing.
  */
 export async function loadTags(vaultPath: string): Promise<string | null> {

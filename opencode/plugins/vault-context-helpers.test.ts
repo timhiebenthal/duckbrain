@@ -16,6 +16,7 @@ import {
   todayStr,
   yesterdayStr,
   loadTags,
+  loadIdentity,
   loadSessionContext,
   loadCompactionSnapshot,
   buildIdleNudgePrompt,
@@ -145,6 +146,23 @@ describe("loadTags", () => {
 
   test("returns null when wiki/ directory missing", async () => {
     expect(await loadTags(vaultPath)).toBeNull()
+  })
+})
+
+// ─── loadIdentity ─────────────────────────────────────────────────────────────
+
+describe("loadIdentity", () => {
+  test("returns content of imprint.md", async () => {
+    await vaultWrite("imprint.md", "# Environment\n- OS: WSL")
+    expect(await loadIdentity(vaultPath)).toBe("# Environment\n- OS: WSL")
+  })
+
+  test("returns null when imprint.md missing", async () => {
+    expect(await loadIdentity(vaultPath)).toBeNull()
+  })
+
+  test("returns null when vault directory is empty", async () => {
+    expect(await loadIdentity(vaultPath)).toBeNull()
   })
 })
 

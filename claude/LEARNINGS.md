@@ -1,3 +1,23 @@
+## User Identity
+
+Read `<vault_root>/imprint.md` at session start — contains communication
+preferences, environment details, and work patterns. If `imprint.md` doesn't
+exist, create it with what you know about the user (OS, shell, profession,
+project context).
+
+### imprint.md maintenance
+
+When the user:
+- States a fact about their setup, preferences, or constraints → update imprint.md
+- Corrects your tone or approach → update imprint.md
+- Says "never do that again" or equivalent about a behavior → update imprint.md
+- Demonstrates a repeated work pattern → consider adding to imprint.md
+- Contradicts an existing line → update or remove that line
+
+Do NOT add session-specific details (one-off tasks, current bugs). Only durable facts.
+
+---
+
 ## Session Learnings
 
 ### Pre-response learning guard
