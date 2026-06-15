@@ -210,41 +210,6 @@ Restart Hermes.
 
 ---
 
-## HTTP Mode
-
-Optionally run DuckBrain as an HTTP server instead of stdio. This lets Claude Desktop and claude.ai web users connect via Settings → Connectors → Add custom connector — no `claude_desktop_config.json` editing needed.
-
-```bash
-# Terminal (foreground)
-duckbrain --http
-# → Uvicorn running on http://127.0.0.1:8000 (CTRL+C to stop)
-
-# Custom port
-duckbrain --http --port 9000
-```
-
-**Setup flow:**
-
-1. `pip install duckbrain`
-2. `duckbrain --http`          # starts server on localhost:8000/mcp
-3. Open Claude Desktop/Web → Settings → Connectors → Add custom connector
-4. Enter URL: `http://localhost:8000/mcp`
-5. DuckBrain tools appear in your Claude session
-
-**Background process options:**
-- Terminal foreground: `duckbrain --http`
-- Terminal background: `duckbrain --http &`
-- systemd user service: `~/.config/systemd/user/duckbrain.service`
-- macOS launchd: `~/Library/LaunchAgents/duckbrain.plist`
-
-**Security:** Default host is `127.0.0.1` — not accessible from other machines on the network. FastMCP has built-in DNS rebinding protection for localhost.
-
-**Troubleshooting:**
-- Port in use? Use `--port` to specify a different port.
-- Need network access? Use `--host 0.0.0.0` (opens to all interfaces — use with caution).
-
----
-
 ## Vault Schema
 
 ```
