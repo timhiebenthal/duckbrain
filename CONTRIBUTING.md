@@ -38,6 +38,17 @@ See `tests/` for the test pattern (fixtures in conftest.py, temp vault per test)
 3. Add tests in `tests/test_vault_X.py`
 4. Run full suite: `uv run pytest`
 
+## Release checklist
+
+Before tagging a release:
+
+```bash
+python scripts/sync-plugin-version.py
+```
+
+This copies `[project].version` from `pyproject.toml` into `claude/.claude-plugin/plugin.json`.
+Also ensure `src/duckbrain/plugin/claude/` matches `claude/` (re-run the bundle copy step).
+
 ## Commit conventions
 
 Use conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `spec:`).
