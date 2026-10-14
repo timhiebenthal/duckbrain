@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     V1 keeps the returned `event` hook and `client.session.prompt(...)`
   - Adds `@opencode/plugin` to `opencode/plugins/package.json`
 
+- **`duckbrain install-plugin --editor opencode`**: OpenCode plugin files are now
+  bundled inside the Python package under `src/duckbrain/plugin/opencode/` and can be
+  installed with the CLI (previously `status="tbd"` - the command refused to run).
+  - `EDITOR_REGISTRY["opencode"].status` is now `supported`; default destination is
+    `~/.config/opencode/plugins`
+  - Post-install step runs `bun install` in the plugins dir, then restarts OpenCode
+  - Editor detection is now marker-based - an existing OpenCode plugins directory
+    without a DuckBrain plugin file is no longer a false positive
+  - A test guards the bundled copy against drifting from `opencode/plugins/`
+
 ## [0.6.3] - 2026-06-08
 
 ### Fixed
