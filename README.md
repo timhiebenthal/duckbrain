@@ -73,6 +73,10 @@ done
 bun install
 ```
 
+The plugin supports **OpenCode 2 and OpenCode 1**. One default export serves both: OpenCode 2 reads its `setup` entrypoint, OpenCode 1 reads its `server` entrypoint.
+
+> **OpenCode 1 users:** the dual entrypoint needs **1.18.29 or newer**. On older V1 releases the plugin will not load - upgrade OpenCode, or use a DuckBrain release from before this plugin shipped.
+
 Restart OpenCode. The plugin gives your AI automatic vault awareness and a few useful defaults:
 
 - **Vault-aware context** — your AI sees your vault's topics, recent notes, and today's daily entry automatically. No need to ask "what's in my vault" or paste paths.
