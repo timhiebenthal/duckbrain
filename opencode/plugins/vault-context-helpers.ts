@@ -212,11 +212,10 @@ heading automatically — you don't need to add a timestamp.)`)
  *   every daily-note write. The model doesn't need to know the time
  *   or hallucinate one. DRY: same guarantee for every MCP client.
  *
- * Known limitation: the prompt appears as a user message in
- * conversation history. The OpenCode SDK's `synthetic: true` flag
- * on TextPartInput might suppress this — worth investigating for
- * v0.4.1. For now, accept the visible nudge in the "agent finished
- * naturally" case (user isn't actively watching).
+ * Delivery: V2 sends this via ctx.session.synthetic(...), so the nudge is
+ * not attributed to the user. V1 has no synthetic API and still sends it
+ * via client.session.prompt(...), where it appears as a user message in
+ * conversation history.
  */
 export function buildIdleNudgePrompt(today: string): string {
   return `Session is idle. If you have new learnings, journal them via vault_write(kind="daily", title="${today}", content="## Topic\\n\\nDetails"). Follow the format in the vault learnings ritual. If nothing new since your last entry, no response needed.`

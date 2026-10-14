@@ -9,7 +9,40 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import plugin from "./vault-context"
+import plugin, { setup } from "./vault-context"
+
+// Minimal fake of the OpenCode 2 context, just enough to drive `setup`.
+// Not a full SDK mock - only the surfaces setup actually touches.
+type IdleEvent = { type: "session.idle"; data: { sessionID: string } }
+
+function makeFakeCtx(events: IdleEvent[]) {
+  const hooks: Record<string, (event: unknown) => Promise<void>> = {}
+  const synthetic: { sessionID: string; text: string }[] = []
+  const prompt: unknown[] = []
+
+  const ctx = {
+    session: {
+      hook: async (name: string, cb: (event: unknown) => Promise<void>) => {
+        hooks[name] = cb
+        return { dispose: async () => {} }
+      },
+      synthetic: async (input: { sessionID: string; text: string }) => {
+        synthetic.push(input)
+      },
+      prompt: async (input: unknown) => {
+        prompt.push(input)
+      },
+    },
+    event: {
+      subscribe: () =>
+        (async function* () {
+          for (const e of events) yield e
+        })(),
+    },
+  }
+
+  return { ctx, hooks, synthetic, prompt }
+}
 
 const originalVaultPath = process.env.VAULT_PATH
 
@@ -47,5 +80,47 @@ describe("v1 server", () => {
   test("is inert (empty hook map) without VAULT_PATH", async () => {
     const hooks = await plugin.server({} as never)
     expect(hooks).toEqual({})
+  })
+})
+
+describe("v2 setup", () => {
+  test("registers context + compaction hooks and returns a cleanup", async () => {
+    process.env.VAULT_PATH = "/tmp/does-not-need-to-exist"
+    const { ctx, hooks } = makeFakeCtx([])
+    const cleanup = await setup(ctx as never)
+    expect(Object.keys(hooks).sort()).toEqual(["compaction", "context"])
+    expect(typeof cleanup).toBe("function")
+  })
+
+  test("idle nudge uses synthetic(), not prompt()", async () => {
+    process.env.VAULT_PATH = "/tmp/does-not-need-to-exist"
+    const { ctx, synthetic, prompt } = makeFakeCtx([
+      { type: "session.idle", data: { sessionID: "ses_1" } },
+    ])
+    await setup(ctx as never)
+    await Bun.sleep(5)
+
+    expect(prompt).toHaveLength(0)
+    expect(synthetic).toHaveLength(1)
+    expect(synthetic[0].sessionID).toBe("ses_1")
+    expect(synthetic[0].text).toContain('vault_write(kind="daily"')
+  })
+
+  test("idle nudge fires once per session (recursion guard)", async () => {
+    process.env.VAULT_PATH = "/tmp/does-not-need-to-exist"
+    const { ctx, synthetic } = makeFakeCtx([
+      { type: "session.idle", data: { sessionID: "ses_1" } },
+      { type: "session.idle", data: { sessionID: "ses_1" } },
+    ])
+    await setup(ctx as never)
+    await Bun.sleep(5)
+    expect(synthetic).toHaveLength(1)
+  })
+
+  test("is inert (no hooks, no cleanup) without VAULT_PATH", async () => {
+    const { ctx, hooks } = makeFakeCtx([])
+    const cleanup = await setup(ctx as never)
+    expect(hooks).toEqual({})
+    expect(cleanup).toBeUndefined()
   })
 })
