@@ -2,7 +2,7 @@
  * DuckBrain vault context plugin for OpenCode — supports OpenCode 1 and 2.
  *
  * OpenCode 2 replaced the plugin API. V2 plugins default-export
- * `Plugin.define({ id, setup(ctx) })` and register hooks on the context.
+ * `Plugin.define({ id, setup })` and register hooks on the context.
  * V1 plugins export a function that returns a hook map; since OpenCode
  * 1.18.29 V1 also accepts an object with a `server` entrypoint.
  *
@@ -34,8 +34,8 @@
  *     process per session (verified 2026-05-31), so plain booleans are safe.
  *   - V2's `event` hook is ctx.event.subscribe(...), aborted from cleanup.
  *     V1's `event` hook is a returned callback.
- *   - The idle prompt is ctx.session.prompt({ sessionID, text }) in V2 and
- *     client.session.prompt({ path, body }) in V1.
+ *   - The idle nudge is ctx.session.synthetic(...) in V2 (not a user turn)
+ *     and client.session.prompt(...) in V1.
  */
 
 import { Plugin } from "@opencode/plugin"
@@ -54,122 +54,132 @@ import {
 
 // ─── OpenCode 2 ───────────────────────────────────────────────────────────────
 
-const plugin = Plugin.define({
-  id: "duckbrain.vault-context",
+/**
+ * V2 entrypoint. Exported (and referenced by `Plugin.define`) so tests can
+ * drive it with a fake context — the hook wiring is otherwise unobservable.
+ */
+export async function setup(
+  ctx: Plugin.Context,
+): Promise<(() => void) | void> {
+  const vaultPath = process.env.VAULT_PATH
+  if (!vaultPath) return
 
-  async setup(ctx) {
-    const vaultPath = process.env.VAULT_PATH
-    if (!vaultPath) return
+  // Per-session state. A V2 plugin instance serves every session in its
+  // location, so module-scoped booleans would leak across concurrent
+  // sessions. Keyed by sessionID instead.
+  const sessionContextInjected = new Set<string>()
+  const idleNudgeSent = new Set<string>()
 
-    // Per-session state. A V2 plugin instance serves every session in its
-    // location, so module-scoped booleans would leak across concurrent
-    // sessions. Keyed by sessionID instead.
-    const sessionContextInjected = new Set<string>()
-    const idleNudgeSent = new Set<string>()
+  // ─── Tiered system prompt injection ────────────────────────────────────
+  await ctx.session.hook("context", async (event) => {
+    const { sessionID } = event
+    try {
+      // Tier 1: Always inject tags + learnings ritual
+      const tags = await loadTags(vaultPath)
+      if (tags) {
+        event.system.push({
+          type: "text",
+          text: buildVaultContextBlock(tags, todayStr()),
+        })
+      }
 
-    // ─── Tiered system prompt injection ──────────────────────────────────
-    await ctx.session.hook("context", async (event) => {
-      const { sessionID } = event
-      try {
-        // Tier 1: Always inject tags + learnings ritual
-        const tags = await loadTags(vaultPath)
-        if (tags) {
+      // Identity — always injected (small, like tags). imprint.md at
+      // vault root captures durable user identity.
+      const identity = await loadIdentity(vaultPath)
+      if (identity) {
+        event.system.push({
+          type: "text",
+          text: buildIdentityBlock(identity),
+        })
+      }
+
+      // Tier 2: Session context — first call per session only (or after
+      // compaction).
+      if (!sessionContextInjected.has(sessionID)) {
+        const context = await loadSessionContext(vaultPath)
+        if (context) {
           event.system.push({
             type: "text",
-            text: buildVaultContextBlock(tags, todayStr()),
-          })
-        }
-
-        // Identity — always injected (small, like tags). imprint.md at
-        // vault root captures durable user identity.
-        const identity = await loadIdentity(vaultPath)
-        if (identity) {
-          event.system.push({
-            type: "text",
-            text: buildIdentityBlock(identity),
-          })
-        }
-
-        // Tier 2: Session context — first call per session only (or after
-        // compaction).
-        if (!sessionContextInjected.has(sessionID)) {
-          const context = await loadSessionContext(vaultPath)
-          if (context) {
-            event.system.push({
-              type: "text",
-              text: `
+            text: `
 <vault-session-context>
 ${context}
 </vault-session-context>
-              `.trim(),
-            })
-          }
-          sessionContextInjected.add(sessionID)
+            `.trim(),
+          })
         }
-      } catch {
-        // Never crash the session over vault unavailability
+        sessionContextInjected.add(sessionID)
       }
-    })
+    } catch {
+      // Never crash the session over vault unavailability
+    }
+  })
 
-    // ─── Compaction: re-inject snapshot + reset session context ───────────
-    //
-    // INTENTIONALLY DUPLICATIVE: the snapshot is kept in the compaction
-    // summary, AND this session is cleared from sessionContextInjected so the
-    // next context hook re-injects the full session context. The model sees
-    // both — cheap, and gives a complete "where am I" view after context loss.
-    //
-    // Also clears idleNudgeSent so the next idle event after compaction can
-    // re-prompt (one nudge per session-segment).
-    await ctx.session.hook("compaction", async (event) => {
-      const { sessionID } = event
-      try {
-        const snapshot = await loadCompactionSnapshot(vaultPath)
-        event.system.push({ type: "text", text: snapshot })
+  // ─── Compaction: re-inject snapshot + reset session context ─────────────
+  //
+  // INTENTIONALLY DUPLICATIVE: the snapshot is kept in the compaction
+  // summary, AND this session is cleared from sessionContextInjected so the
+  // next context hook re-injects the full session context. The model sees
+  // both — cheap, and gives a complete "where am I" view after context loss.
+  //
+  // Also clears idleNudgeSent so the next idle event after compaction can
+  // re-prompt (one nudge per session-segment).
+  await ctx.session.hook("compaction", async (event) => {
+    const { sessionID } = event
+    try {
+      const snapshot = await loadCompactionSnapshot(vaultPath)
+      event.system.push({ type: "text", text: snapshot })
 
-        sessionContextInjected.delete(sessionID)
-        idleNudgeSent.delete(sessionID)
-      } catch {
-        // Never crash the session over vault unavailability
-      }
-    })
+      sessionContextInjected.delete(sessionID)
+      idleNudgeSent.delete(sessionID)
+    } catch {
+      // Never crash the session over vault unavailability
+    }
+  })
 
-    // ─── Session lifecycle events ─────────────────────────────────────────
-    //
-    // session.idle auto-save. When the agent finishes a turn and the session
-    // transitions to idle, re-prompt the model with a journal nudge. The
-    // model decides whether anything is worth saving.
-    //
-    // The `idleNudgeSent` set prevents recursion: after the re-prompt the
-    // model responds, the session goes idle again, and the handler fires
-    // again. The set is mutated synchronously, so the second fire is a no-op.
-    const controller = new AbortController()
+  // ─── Session lifecycle events ───────────────────────────────────────────
+  //
+  // session.idle auto-save. When the agent finishes a turn and the session
+  // transitions to idle, nudge the model to journal. The model decides
+  // whether anything is worth saving.
+  //
+  // synthetic() (not prompt()): a synthetic message is not attributed to the
+  // user, so the nudge does not appear in history as if the user typed it.
+  //
+  // The `idleNudgeSent` set prevents recursion: after the nudge the model may
+  // respond, the session goes idle again, and the handler fires again. The set
+  // is mutated synchronously, so the second fire is a no-op.
+  const controller = new AbortController()
 
-    void (async () => {
-      try {
-        for await (const event of ctx.event.subscribe({
-          signal: controller.signal,
-        })) {
-          if (event.type !== "session.idle") continue
-          const { sessionID } = event.data
-          if (idleNudgeSent.has(sessionID)) continue
-          idleNudgeSent.add(sessionID)
-          try {
-            await ctx.session.prompt({
-              sessionID,
-              text: buildIdleNudgePrompt(todayStr()),
-            })
-          } catch {
-            // Best-effort. Session is going idle; the call may not land
-            // before teardown. Manual /journal covers the guaranteed case.
-          }
+  void (async () => {
+    try {
+      for await (const event of ctx.event.subscribe({
+        signal: controller.signal,
+      })) {
+        if (event.type !== "session.idle") continue
+        const { sessionID } = event.data
+        if (idleNudgeSent.has(sessionID)) continue
+        idleNudgeSent.add(sessionID)
+        try {
+          await ctx.session.synthetic({
+            sessionID,
+            text: buildIdleNudgePrompt(todayStr()),
+          })
+        } catch {
+          // Best-effort. Session is going idle; the call may not land
+          // before teardown. Manual /journal covers the guaranteed case.
         }
-      } catch {
-        // Subscription aborted during unload
       }
-    })()
+    } catch {
+      // Subscription aborted during unload
+    }
+  })()
 
-    return () => controller.abort()
-  },
+  return () => controller.abort()
+}
+
+const plugin = Plugin.define({
+  id: "duckbrain.vault-context",
+  setup,
 })
 
 // ─── OpenCode 1 (needs >= 1.18.29 for object entrypoints) ──────────────────────

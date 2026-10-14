@@ -57,6 +57,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     without a DuckBrain plugin file is no longer a false positive
   - A test guards the bundled copy against drifting from `opencode/plugins/`
 
+### Changed
+
+- **OpenCode 2 idle nudge uses `ctx.session.synthetic()`**: the end-of-session
+  journal nudge is no longer injected as a user message in conversation history.
+  V1 keeps `client.session.prompt()` (it has no synthetic API). The V2 wiring was
+  extracted into an exported `setup()` so the hook behaviour is unit-tested with a
+  fake context instead of only shape-tested.
+
 ## [0.6.3] - 2026-06-08
 
 ### Fixed
