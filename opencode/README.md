@@ -45,6 +45,8 @@ Recommended OpenCode configuration for DuckBrain users. Copy these files to your
 - **OpenCode 2** reads `Plugin.define({ id, setup })` and registers hooks on the context.
 - **OpenCode 1** reads the `server` entrypoint (needs **OpenCode >= 1.18.29**).
 
+Install with `duckbrain install-plugin --editor opencode`, or copy the files as shown in the root README.
+
 The two hook wirings are separate code; the injected text comes from shared helpers so the runtimes cannot drift.
 
 ### Config key

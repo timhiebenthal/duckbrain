@@ -73,6 +73,14 @@ done
 bun install
 ```
 
+Or, if you installed DuckBrain as a CLI tool, let it place the files for you:
+
+```bash
+duckbrain install-plugin --editor opencode
+```
+
+That copies the bundled plugin files to `~/.config/opencode/plugins`, then prints the `bun install` + restart step.
+
 The plugin supports **OpenCode 2 and OpenCode 1**. One default export serves both: OpenCode 2 reads its `setup` entrypoint, OpenCode 1 reads its `server` entrypoint.
 
 > **OpenCode 1 users:** the dual entrypoint needs **1.18.29 or newer**. On older V1 releases the plugin will not load - upgrade OpenCode, or use a DuckBrain release from before this plugin shipped.

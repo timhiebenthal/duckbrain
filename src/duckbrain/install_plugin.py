@@ -16,6 +16,9 @@ class EditorTarget:
     post_install_step: str
     status: str
     bundle_name: str
+    # Relative path that must exist under default_path for the editor to count
+    # as having DuckBrain installed. None falls back to directory existence.
+    marker: str | None = None
 
 
 EDITOR_REGISTRY: dict[str, EditorTarget] = {
@@ -24,12 +27,14 @@ EDITOR_REGISTRY: dict[str, EditorTarget] = {
         post_install_step="claude plugin update duckbrain@duckbrain-local",
         status="supported",
         bundle_name="claude",
+        marker=".claude-plugin/plugin.json",
     ),
     "opencode": EditorTarget(
-        default_path=Path.home() / ".local/share/opencode/plugins/duckbrain",
-        post_install_step="TBD",
-        status="tbd",
+        default_path=Path.home() / ".config/opencode/plugins",
+        post_install_step="cd ~/.config/opencode/plugins && bun install, then restart OpenCode",
+        status="supported",
         bundle_name="opencode",
+        marker="vault-context.ts",
     ),
     "cursor": EditorTarget(
         default_path=Path.home() / ".cursor/plugins/duckbrain",
@@ -49,8 +54,11 @@ def get_plugin_dir(editor_bundle: str) -> Path:
 def detect_installed_editors() -> list[tuple[str, Path]]:
     found: list[tuple[str, Path]] = []
     for slug, target in EDITOR_REGISTRY.items():
-        if target.default_path.exists():
-            found.append((slug, target.default_path))
+        if not target.default_path.exists():
+            continue
+        if target.marker is not None and not (target.default_path / target.marker).exists():
+            continue
+        found.append((slug, target.default_path))
     return found
 
 
