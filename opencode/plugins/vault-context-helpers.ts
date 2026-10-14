@@ -85,6 +85,61 @@ export async function loadTags(vaultPath: string): Promise<string | null> {
 }
 
 /**
+ * Always-injected `<vault-context>` block: tag map + learnings ritual.
+ *
+ * Shared by both the OpenCode v1 (`server`) and v2 (`setup`) entrypoints so
+ * the injected text cannot drift between runtimes. `today` is the local
+ * YYYY-MM-DD (see todayStr) used in the ritual's vault_write example.
+ */
+export function buildVaultContextBlock(tags: string, today: string): string {
+  return `
+<vault-context>
+## Vault topic tags
+
+The tags below list every topic documented in your personal Obsidian vault.
+Use them to decide how to answer before reaching for any tool:
+
+- If the topic matches a tag → use vault_read or vault_search to retrieve the page
+- If the topic does NOT match any tag → do not call vault tools; search the web or answer from general knowledge instead
+
+Do not call vault_info() or vault_search() speculatively. The tags below are the complete topic map.
+
+${tags.trim()}
+
+## Vault learnings ritual
+
+Save learnings via vault_write(kind="daily", title="${today}", content="## Topic\\n\\nDetails"):
+- After completing a task or fixing a bug
+- After finding root cause of a bug
+- After a discovery during investigation
+- After >5 min stuck on a problem
+- After an architecture decision
+- At end of session (/journal)
+
+The server prepends HH:MM — to the section heading automatically — you don't
+need to add a timestamp. The model just writes the content; writer.py stamps it.
+This is a server-side guarantee, so it works for every MCP client (OpenCode,
+Cursor, Claude Code, etc.) without each client having to compute the time.
+
+Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
+</vault-context>
+  `.trim()
+}
+
+/**
+ * Always-injected `<vault-identity>` block (imprint.md at vault root).
+ *
+ * Shared by both entrypoints; see buildVaultContextBlock for why.
+ */
+export function buildIdentityBlock(identity: string): string {
+  return `
+<vault-identity>
+${identity}
+</vault-identity>
+  `.trim()
+}
+
+/**
  * Tier 2: Session context — injected on first call + after compaction.
  * Log tail + today + yesterday daily notes.
  */
