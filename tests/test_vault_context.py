@@ -8,6 +8,26 @@ from datetime import date, timedelta
 from pathlib import Path
 
 
+def test_codex_snapshot_contains_available_vault_context(temp_vault: Path) -> None:
+    from duckbrain.tools.vault_context import build_codex_snapshot
+
+    (temp_vault / "imprint.md").write_text("identity-marker")
+    (temp_vault / "wiki" / "tags.md").write_text("tags-marker")
+    (temp_vault / "wiki" / "log.md").write_text("\n".join(f"entry-{n}" for n in range(40)))
+    _create_daily_file(temp_vault, date.today(), "today-marker")
+    _create_daily_file(temp_vault, date.today() - timedelta(days=1), "yesterday-marker")
+    result = build_codex_snapshot(str(temp_vault))
+    for marker in ("identity-marker", "tags-marker", "entry-39", "today-marker", "yesterday-marker"):
+        assert marker in result
+    assert "entry-0\n" not in result
+
+
+def test_codex_snapshot_handles_missing_optional_files(tmp_path: Path) -> None:
+    from duckbrain.tools.vault_context import build_codex_snapshot
+
+    assert isinstance(build_codex_snapshot(str(tmp_path)), str)
+
+
 def _create_daily_file(vault: Path, day: date, content: str) -> Path:
     """Create a daily note file at vault/daily/{day}.md."""
     daily_dir = vault / "daily"

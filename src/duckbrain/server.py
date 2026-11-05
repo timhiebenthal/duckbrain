@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Icon
 
-from duckbrain.tools.vault_context import handle_vault_context
+from duckbrain.tools.vault_context import build_codex_snapshot, handle_vault_context
 from duckbrain.tools.vault_info import handle_vault_info
 from duckbrain.tools.vault_read import handle_vault_read
 from duckbrain.tools.vault_search import handle_vault_search
@@ -61,6 +61,11 @@ def main() -> None:
     bootstrap_vault(vault_path)
     server = FastMCP(
         "duckbrain",
+        instructions=(
+            build_codex_snapshot(vault_path)
+            if os.environ.get("DUCKBRAIN_CODEX_CONTEXT") == "1"
+            else None
+        ),
         icons=[
             Icon(
                 src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/favicon.png",

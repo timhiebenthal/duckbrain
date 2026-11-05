@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Codex CLI integration**: opt-in startup vault context, a journal skill, and an optional prompt reminder. See [Codex setup](codex/README.md).
+
 - **Cross-platform setup automation**: `setup-duckbrain.sh` (macOS/Linux) and
   `setup-duckbrain.ps1` (Windows+WSL2) provide one-command DuckBrain installation
   with Claude Desktop configuration. Includes `docs/setup-guide.md` and

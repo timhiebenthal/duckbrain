@@ -92,6 +92,30 @@ def _stop_server(server_proc: subprocess.Popen) -> None:
         server_proc.kill()
 
 
+def test_codex_instructions_are_opt_in(temp_vault: Path) -> None:
+    (temp_vault / "imprint.md").write_text("unique-identity-marker")
+    for enabled in (False, True):
+        env = os.environ.copy()
+        env["VAULT_PATH"] = str(temp_vault)
+        env.pop("DUCKBRAIN_CODEX_CONTEXT", None)
+        if enabled:
+            env["DUCKBRAIN_CODEX_CONTEXT"] = "1"
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "duckbrain.server"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env, text=True,
+        )
+        try:
+            response = _mcp_request_line(proc, "initialize", {
+                "protocolVersion": "2024-11-05", "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0.1"},
+            })
+            instructions = response["result"].get("instructions") or ""
+            assert ("unique-identity-marker" in instructions) is enabled
+        finally:
+            _stop_server(proc)
+
+
 def test_e2e_vault_info(temp_vault: Path) -> None:
     """Fetch vault info and verify counts match the temp vault."""
     server_proc = _start_server(temp_vault)
