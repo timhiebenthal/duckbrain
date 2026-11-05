@@ -4,9 +4,25 @@
   <img src="https://raw.githubusercontent.com/timhiebenthal/duckbrain/main/logo/logo_writing_white_bg.png" alt="DuckBrain" width="500" />
 </p>
 
-DuckDB-backed MCP memory server for Obsidian vaults. Gives AI coding agents read/write access to your personal wiki — structured pages, full-text search, automatic indexing.
+DuckBrain gives AI coding agents read and write access to an Obsidian vault over MCP. It indexes Markdown pages with DuckDB full-text search, so agents can find and update wiki pages while the source stays in your vault. Install it with `uv tool install duckbrain`, then set `VAULT_PATH` and run `duckbrain` as the MCP server.
 
-## Installation
+## Quick start
+
+Install DuckBrain:
+
+```bash
+uv tool install duckbrain
+```
+
+Run the MCP server over stdio, pointing it at your vault:
+
+```bash
+VAULT_PATH=/path/to/your/vault duckbrain
+```
+
+To connect an AI coding agent, configure its MCP client to run `duckbrain` with `VAULT_PATH` set. The setup sections below show configurations for OpenCode, Claude Code, Cursor, and Hermes.
+
+## Agent setup
 
 ### Quick Setup (Recommended)
 
@@ -27,25 +43,20 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/timhiebenthal/duckbrai
 The script installs DuckBrain, configures Claude Desktop, validates everything, and
 is safe to run multiple times. See the [Setup Guide](docs/setup-guide.md) for details.
 
-### Manual Install
-
-```bash
-uv tool install duckbrain
-```
-
-Then pick your agent:
+After installing DuckBrain, follow the setup guide for your agent:
 
 - [OpenCode](#opencode) — MCP server + session plugin (recommended)
 - [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
 - [Cursor](#cursor) — MCP server + rules + hooks
 - [Hermes](#hermes) — MCP server + AGENTS.md
-- Other Agents (e.g. Codex, Gemini) will follow after testing
+
+For another MCP client, run `duckbrain` with `VAULT_PATH` set.
 
 ---
 
 ### OpenCode
 
-**Best experience** (as I use OpenCode myself) — session plugin gives the AI automatic vault awareness.
+The OpenCode setup includes the MCP server and a session plugin for vault context and journaling.
 
 Add to `opencode.json`:
 
