@@ -7,6 +7,33 @@ from typing import Any
 from duckbrain.tools.vault_search import handle_vault_search
 
 
+def build_codex_snapshot(vault_path: str) -> str:
+    """Build a startup snapshot of optional vault context for Codex."""
+    root = Path(vault_path)
+    today = date.today()
+    files = [
+        ("Vault topic tags", root / "wiki" / "tags.md"),
+        ("Vault identity", root / "imprint.md"),
+        ("Recent vault writes", root / "wiki" / "log.md"),
+        ("Today's daily note", root / "daily" / f"{today.isoformat()}.md"),
+        (
+            "Yesterday's daily note",
+            root / "daily" / f"{(today - timedelta(days=1)).isoformat()}.md",
+        ),
+    ]
+    parts = ["DuckBrain vault context (startup snapshot):"]
+    for label, path in files:
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if label == "Recent vault writes":
+            content = "\n".join(content.splitlines()[-30:])
+        if content.strip():
+            parts.append(f"## {label}\n{content.strip()}")
+    return "\n\n".join(parts)
+
+
 def _read_daily(vault_path: str, day: date) -> dict[str, str] | None:
     """Read a daily note file and return title/filepath/content or None."""
     date_str = day.isoformat()

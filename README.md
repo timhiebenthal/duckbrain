@@ -49,6 +49,7 @@ After installing DuckBrain, follow the setup guide for your agent:
 - [Claude Code](#claude-code) — MCP server + CLAUDE.md + SessionStart hook
 - [Cursor](#cursor) — MCP server + rules + hooks
 - [Hermes](#hermes) — MCP server + AGENTS.md
+- [Codex CLI](codex/README.md) — vault context and journaling
 
 For another MCP client, run `duckbrain` with `VAULT_PATH` set.
 
