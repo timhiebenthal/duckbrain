@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "duckdb>=1.5.3",
-    "mcp[cli]>=1.27.1",
+    "mcp[cli]>=1.27.1,<2",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
 ]
