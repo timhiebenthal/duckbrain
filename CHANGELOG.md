@@ -34,6 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hermes: instructions in `AGENTS.md` to read + maintain
   - Seed file created at vault root with initial identity content
 
+- **OpenCode plugin now supports OpenCode 2 as well as 1**: `opencode/plugins/vault-context.ts`
+  default-exports a dual entrypoint - a V2 `Plugin.define({ id, setup })` definition and a
+  V1 `server` hook map. OpenCode 2 reads `setup`; OpenCode 1 (>= 1.18.29) reads `server`.
+  The injected text comes from shared helpers (`buildVaultContextBlock`,
+  `buildIdentityBlock`) so the two runtimes cannot drift.
+  - V2 per-session state is keyed by `sessionID` (one plugin instance serves every
+    session in its location); V1 keeps per-process booleans
+  - V2 injects content parts (`event.system.push({ type: "text", text })`); V1 keeps
+    raw strings
+  - V2 idle nudge uses `ctx.event.subscribe()` aborted from the plugin cleanup;
+    V1 keeps the returned `event` hook and `client.session.prompt(...)`
+  - Adds `@opencode/plugin` to `opencode/plugins/package.json`
+
 ## [0.6.3] - 2026-06-08
 
 ### Fixed

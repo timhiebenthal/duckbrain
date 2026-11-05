@@ -14,5 +14,10 @@
     "resolveJsonModule": true,
     "verbatimModuleSyntax": false
   },
-  "include": ["vault-context.ts", "vault-context-helpers.ts", "vault-context-helpers.test.ts"]
+  "include": [
+    "vault-context.ts",
+    "vault-context-helpers.ts",
+    "vault-context-helpers.test.ts",
+    "vault-context.test.ts"
+  ]
 }

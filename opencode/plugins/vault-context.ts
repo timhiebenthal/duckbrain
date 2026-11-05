@@ -1,123 +1,216 @@
 /**
- * DuckBrain vault context plugin for OpenCode — v2.1
+ * DuckBrain vault context plugin for OpenCode — supports OpenCode 1 and 2.
+ *
+ * OpenCode 2 replaced the plugin API. V2 plugins default-export
+ * `Plugin.define({ id, setup(ctx) })` and register hooks on the context.
+ * V1 plugins export a function that returns a hook map; since OpenCode
+ * 1.18.29 V1 also accepts an object with a `server` entrypoint.
+ *
+ * Both implementations live in one default export:
+ *   - V2 reads `id` + `setup`
+ *   - V1 (>= 1.18.29) reads `server`
+ *
+ * They share the pure helpers (vault-context-helpers.ts), so the injected
+ * text cannot drift between runtimes. See specs/2026-10-14-opencode-v2-plugin/.
  *
  * Placement:  ~/.config/opencode/plugins/vault-context.ts  (global)
  *         or  .opencode/plugins/vault-context.ts            (project-local)
  *
  * Requires:   VAULT_PATH env var pointing to your Obsidian vault root
+ *             @opencode/plugin  (V2 runtime types; V2 provides it at runtime)
+ *             @opencode-ai/plugin (V1 types)
  *
- * Architecture: Tiered injection + compaction preservation + idle auto-save
- *   - Tags: always injected (small ~2K, routing signal)
- *   - Log + dailies: first call only (expensive, session context)
+ * Architecture (identical in both runtimes):
+ *   - Tags + identity: always injected (small, routing signal)
+ *   - Log + dailies: first call per session (expensive, session context)
  *   - Compaction: re-inject snapshot + journal nudge
- *   - session.idle: re-prompt model to journal before session ends
+ *   - session.idle: re-prompt the model to journal before the session ends
  *
- * Proven constraints (from probe):
- *   ✅  Bun.file(path).text()     — works, use this for all file reads
- *   ❌  import("fs") / require     — blocked by sandbox
- *   ✅  process.env / Bun.env     — works
- *   ✅  output.system.push()      — mutations reach the LLM
- *   ✅  experimental.session.compacting — fires, output.context.push() works
- *   ✅  event hook                — fires with EventSessionIdle; client.session.prompt() works
- *
- * v2.1 additions (this file):
- *   - Added `event` hook listening for `session.idle` to re-prompt the
- *     model with a journal nudge via client.session.prompt(). Best-effort
- *     auto-save for the "agent finished naturally" case. Fire-and-forget
- *     by design — window-close is acceptable loss (user can run /journal
- *     before close for guaranteed save).
- *   - Added `idleNudgeSent` flag, reset on compaction (same pattern as
- *     `sessionContextInjected`). Prevents recursion: one nudge per
- *     session-segment between compactions.
+ * Runtime differences that matter:
+ *   - V2 injects content parts: event.system.push({ type: "text", text })
+ *     V1 injects raw strings:    output.system.push(text)
+ *   - A V2 plugin instance serves every session in its location, so the
+ *     per-session flags are Sets keyed by sessionID. V1 spawns one plugin
+ *     process per session (verified 2026-05-31), so plain booleans are safe.
+ *   - V2's `event` hook is ctx.event.subscribe(...), aborted from cleanup.
+ *     V1's `event` hook is a returned callback.
+ *   - The idle prompt is ctx.session.prompt({ sessionID, text }) in V2 and
+ *     client.session.prompt({ path, body }) in V1.
  */
 
-import type { Plugin } from "@opencode-ai/plugin"
+import { Plugin } from "@opencode/plugin"
+import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+
 import {
-  loadIdentity,
-  loadTags,
-  loadSessionContext,
-  loadCompactionSnapshot,
+  buildIdentityBlock,
   buildIdleNudgePrompt,
+  buildVaultContextBlock,
+  loadCompactionSnapshot,
+  loadIdentity,
+  loadSessionContext,
+  loadTags,
   todayStr,
 } from "./vault-context-helpers"
 
-// ─── plugin export ────────────────────────────────────────────────────────────
+// ─── OpenCode 2 ───────────────────────────────────────────────────────────────
 
-export const VaultContextPlugin: Plugin = async ({ client }) => {
+const plugin = Plugin.define({
+  id: "duckbrain.vault-context",
+
+  async setup(ctx) {
+    const vaultPath = process.env.VAULT_PATH
+    if (!vaultPath) return
+
+    // Per-session state. A V2 plugin instance serves every session in its
+    // location, so module-scoped booleans would leak across concurrent
+    // sessions. Keyed by sessionID instead.
+    const sessionContextInjected = new Set<string>()
+    const idleNudgeSent = new Set<string>()
+
+    // ─── Tiered system prompt injection ──────────────────────────────────
+    await ctx.session.hook("context", async (event) => {
+      const { sessionID } = event
+      try {
+        // Tier 1: Always inject tags + learnings ritual
+        const tags = await loadTags(vaultPath)
+        if (tags) {
+          event.system.push({
+            type: "text",
+            text: buildVaultContextBlock(tags, todayStr()),
+          })
+        }
+
+        // Identity — always injected (small, like tags). imprint.md at
+        // vault root captures durable user identity.
+        const identity = await loadIdentity(vaultPath)
+        if (identity) {
+          event.system.push({
+            type: "text",
+            text: buildIdentityBlock(identity),
+          })
+        }
+
+        // Tier 2: Session context — first call per session only (or after
+        // compaction).
+        if (!sessionContextInjected.has(sessionID)) {
+          const context = await loadSessionContext(vaultPath)
+          if (context) {
+            event.system.push({
+              type: "text",
+              text: `
+<vault-session-context>
+${context}
+</vault-session-context>
+              `.trim(),
+            })
+          }
+          sessionContextInjected.add(sessionID)
+        }
+      } catch {
+        // Never crash the session over vault unavailability
+      }
+    })
+
+    // ─── Compaction: re-inject snapshot + reset session context ───────────
+    //
+    // INTENTIONALLY DUPLICATIVE: the snapshot is kept in the compaction
+    // summary, AND this session is cleared from sessionContextInjected so the
+    // next context hook re-injects the full session context. The model sees
+    // both — cheap, and gives a complete "where am I" view after context loss.
+    //
+    // Also clears idleNudgeSent so the next idle event after compaction can
+    // re-prompt (one nudge per session-segment).
+    await ctx.session.hook("compaction", async (event) => {
+      const { sessionID } = event
+      try {
+        const snapshot = await loadCompactionSnapshot(vaultPath)
+        event.system.push({ type: "text", text: snapshot })
+
+        sessionContextInjected.delete(sessionID)
+        idleNudgeSent.delete(sessionID)
+      } catch {
+        // Never crash the session over vault unavailability
+      }
+    })
+
+    // ─── Session lifecycle events ─────────────────────────────────────────
+    //
+    // session.idle auto-save. When the agent finishes a turn and the session
+    // transitions to idle, re-prompt the model with a journal nudge. The
+    // model decides whether anything is worth saving.
+    //
+    // The `idleNudgeSent` set prevents recursion: after the re-prompt the
+    // model responds, the session goes idle again, and the handler fires
+    // again. The set is mutated synchronously, so the second fire is a no-op.
+    const controller = new AbortController()
+
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({
+          signal: controller.signal,
+        })) {
+          if (event.type !== "session.idle") continue
+          const { sessionID } = event.data
+          if (idleNudgeSent.has(sessionID)) continue
+          idleNudgeSent.add(sessionID)
+          try {
+            await ctx.session.prompt({
+              sessionID,
+              text: buildIdleNudgePrompt(todayStr()),
+            })
+          } catch {
+            // Best-effort. Session is going idle; the call may not land
+            // before teardown. Manual /journal covers the guaranteed case.
+          }
+        }
+      } catch {
+        // Subscription aborted during unload
+      }
+    })()
+
+    return () => controller.abort()
+  },
+})
+
+// ─── OpenCode 1 (needs >= 1.18.29 for object entrypoints) ──────────────────────
+
+async function server(input: PluginInput): Promise<Hooks> {
   const vaultPath = process.env.VAULT_PATH
   if (!vaultPath) return {}
 
-  // Module-scoped flags. Safe only if OpenCode spawns one plugin
-  // process per session — verified via probe 2026-05-31 (see
-  // specs/2026-05-31-vault-interaction-robustness/spec.md). If
-  // OpenCode ever reuses a process across sessions, these leak
-  // state — switch to Map<sessionID, bool> using the sessionID
-  // from system.transform input.
+  // Module-scoped flags. Safe because V1 spawns one plugin process per
+  // session (verified via probe 2026-05-31). If V1 ever reuses a process
+  // across sessions, switch to Map<sessionID, bool>.
   let sessionContextInjected = false
   let idleNudgeSent = false
 
   return {
     // ─── Tiered system prompt injection ──────────────────────────────────
-    "experimental.chat.system.transform": async (input, output) => {
+    "experimental.chat.system.transform": async (_input, output) => {
       try {
-        // Tier 1: Always inject tags
+        // Tier 1: Always inject tags + learnings ritual
         const tags = await loadTags(vaultPath)
         if (tags) {
-          output.system.push(`
-<vault-context>
-## Vault topic tags
-
-The tags below list every topic documented in your personal Obsidian vault.
-Use them to decide how to answer before reaching for any tool:
-
-- If the topic matches a tag → use vault_read or vault_search to retrieve the page
-- If the topic does NOT match any tag → do not call vault tools; search the web or answer from general knowledge instead
-
-Do not call vault_info() or vault_search() speculatively. The tags below are the complete topic map.
-
-${tags.trim()}
-
-## Vault learnings ritual
-
-Save learnings via vault_write(kind="daily", title="${todayStr()}", content="## Topic\\n\\nDetails"):
-- After completing a task or fixing a bug
-- After finding root cause of a bug
-- After a discovery during investigation
-- After >5 min stuck on a problem
-- After an architecture decision
-- At end of session (/journal)
-
-The server prepends HH:MM — to the section heading automatically — you don't
-need to add a timestamp. The model just writes the content; writer.py stamps it.
-This is a server-side guarantee, so it works for every MCP client (OpenCode,
-Cursor, Claude Code, etc.) without each client having to compute the time.
-
-Format: caveman-concise. Cut filler words. vault_search first to avoid duplicates.
-</vault-context>
-          `.trim())
+          output.system.push(buildVaultContextBlock(tags, todayStr()))
         }
 
-        // Identity — always injected (small, like tags). imprint.md at
-        // vault root captures durable user identity — environment,
-        // communication preferences, work patterns, etc.
+        // Identity — always injected (small, like tags).
         const identity = await loadIdentity(vaultPath)
         if (identity) {
-          output.system.push(`
-<vault-identity>
-${identity}
-</vault-identity>
-          `.trim())
+          output.system.push(buildIdentityBlock(identity))
         }
 
         // Tier 2: Session context — first call only (or after compaction)
         if (!sessionContextInjected) {
           const context = await loadSessionContext(vaultPath)
           if (context) {
-            output.system.push(`
+            output.system.push(
+              `
 <vault-session-context>
 ${context}
 </vault-session-context>
-            `.trim())
+              `.trim(),
+            )
           }
           sessionContextInjected = true
         }
@@ -127,20 +220,7 @@ ${context}
     },
 
     // ─── Compaction: re-inject snapshot + reset session context ───────────
-    //
-    // INTENTIONALLY DUPLICATIVE: the compactor pushes a snapshot into
-    // output.context (for the compaction summary prompt), AND we reset
-    // sessionContextInjected to false so the next system.transform call
-    // re-injects the full session context. The model sees BOTH:
-    //   - snapshot: kept in the compaction summary
-    //   - full context: pushed to the fresh system prompt after compaction
-    // The cost is ~4K chars of duplication per compaction event — small,
-    // and worth it for the model to have a complete "where am I" view
-    // after context loss. See spec D2 + "What's still missing" notes.
-    //
-    // v2.1 also resets idleNudgeSent so the next idle event after
-    // compaction can re-prompt (one nudge per session-segment).
-    "experimental.session.compacting": async (input, output) => {
+    "experimental.session.compacting": async (_input, output) => {
       try {
         const snapshot = await loadCompactionSnapshot(vaultPath)
         output.context.push(snapshot)
@@ -155,47 +235,27 @@ ${context}
     },
 
     // ─── Session lifecycle events ─────────────────────────────────────────
-    //
-    // v2.1: session.idle auto-save. When the agent finishes a turn and
-    // the session transitions to idle, re-prompt the model with a
-    // journal nudge. The model decides whether anything is worth
-    // saving — if so, it calls vault_write.
-    //
-    // Why re-prompt vs direct tool call: the model knows what's worth
-    // saving (root causes, architecture decisions, debugging journeys).
-    // The plugin doesn't. Bypassing the model means constructing a
-    // save blindly, which is worse.
-    //
-    // Why fire-and-forget: the event hook handler is async, but
-    // OpenCode's plugin runtime drops the return promise (per
-    // opencode issue #16879). We kick off the call and accept the
-    // window-close risk. Compaction + manual /journal cover the
-    // "guarantee" cases.
-    //
-    // Why a flag: prevents recursion. After the re-prompt, the model
-    // responds, the session goes idle again, the handler fires again.
-    // The flag is set synchronously, so the second fire is a no-op.
-    // Reset on compaction so the next segment can nudge again.
     event: async ({ event }) => {
       if (event.type !== "session.idle" || idleNudgeSent) return
       idleNudgeSent = true
       try {
         // v1 SDK shape: { path: { id }, body: { parts } }
-        await client.session.prompt({
+        await input.client.session.prompt({
           path: { id: event.properties.sessionID },
           body: {
-            parts: [
-              { type: "text", text: buildIdleNudgePrompt(todayStr()) },
-            ],
+            parts: [{ type: "text", text: buildIdleNudgePrompt(todayStr()) }],
           },
         })
       } catch {
-        // Best-effort. Session is going idle; the call may not land
-        // before the process tears down. Manual /journal covers the
-        // guaranteed-save case.
+        // Best-effort. Manual /journal covers the guaranteed-save case.
       }
     },
   }
 }
 
-export default VaultContextPlugin
+// One default export serves both runtimes: V2 reads `id` + `setup`,
+// V1 reads `server`. Extra keys are ignored by the other runtime.
+export default {
+  ...plugin,
+  server,
+}

@@ -20,6 +20,8 @@ import {
   loadSessionContext,
   loadCompactionSnapshot,
   buildIdleNudgePrompt,
+  buildVaultContextBlock,
+  buildIdentityBlock,
   MAX_LOG_LINES,
 } from "./vault-context-helpers"
 
@@ -339,3 +341,48 @@ describe("buildIdleNudgePrompt", () => {
 
 // (currentTimeStr was removed in v0.4.0 — timestamp guarantee moved to
 //  the server's writer.py, applied uniformly to every MCP client.)
+
+// ─── buildVaultContextBlock ──────────────────────────────────────────────────
+
+describe("buildVaultContextBlock", () => {
+  const tags = "ai (40), dbt (20)"
+  const today = "2026-06-15"
+
+  test("wraps the tag list in a <vault-context> block", () => {
+    const block = buildVaultContextBlock(tags, today)
+    expect(block.startsWith("<vault-context>")).toBe(true)
+    expect(block.endsWith("</vault-context>")).toBe(true)
+    expect(block).toContain(tags)
+  })
+
+  test("is trim-stable (no leading/trailing whitespace)", () => {
+    const block = buildVaultContextBlock(tags, today)
+    expect(block).toBe(block.trim())
+  })
+
+  test("stamps the learnings ritual with the supplied date", () => {
+    const block = buildVaultContextBlock(tags, today)
+    expect(block).toContain('vault_write(kind="daily", title="2026-06-15"')
+  })
+
+  test("tells the model not to hallucinate a timestamp", () => {
+    const block = buildVaultContextBlock(tags, today)
+    expect(block).toContain("server prepends HH:MM")
+  })
+})
+
+// ─── buildIdentityBlock ──────────────────────────────────────────────────────
+
+describe("buildIdentityBlock", () => {
+  test("wraps the identity content in a <vault-identity> block", () => {
+    const block = buildIdentityBlock("# Environment\n- OS: WSL")
+    expect(block).toBe(
+      "<vault-identity>\n# Environment\n- OS: WSL\n</vault-identity>",
+    )
+  })
+
+  test("is trim-stable", () => {
+    const block = buildIdentityBlock("# imprint")
+    expect(block).toBe(block.trim())
+  })
+})
