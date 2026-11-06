@@ -1,5 +1,9 @@
 # AGENTS.md — DuckBrain coding conventions
 
+## DuckBrain MCP context
+
+At the start of each session, discover the DuckBrain MCP server and its tools to load vault context before responding. Use each tool's advertised input schema when calling it; if validation fails, correct the arguments from the error and retry once.
+
 ## Core mandate
 
 Test-Driven Development. No production code without a failing test first.
