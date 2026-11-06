@@ -114,10 +114,11 @@ def main() -> None:
         include_search: bool = True,
         search_limit: int = 10,
     ) -> dict:
-        """Get vault context: today's + yesterday's daily notes, plus keyword search.
+        """Get vault context: today's + yesterday's daily notes, plus optional keyword search.
 
         Args:
-            keywords: Search keywords (joined with spaces for FTS). None if include_search=False.
+            keywords: List of strings combined into one FTS query, e.g.
+                ["build skill", "subagents"]. Omit or pass [] to skip search.
             include_dailies: Whether to include today's and yesterday's daily notes.
             include_search: Whether to perform keyword search.
             search_limit: Max search results (default 10).
