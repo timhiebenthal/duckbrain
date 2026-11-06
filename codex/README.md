@@ -13,7 +13,7 @@ If DuckBrain is already registered, inspect its configuration with `codex mcp ge
 Add the following to `~/.codex/AGENTS.md` for all projects, or to a project's `AGENTS.md`:
 
 ```markdown
-At the start of each session, discover the duckbrain MCP server and its tools to load its vault context before responding.
+At the start of each session, discover the duckbrain MCP server and its tools to load its vault context before responding. Use each tool's advertised input schema when calling it; if validation fails, correct the arguments from the error and retry once.
 ```
 
 Start a new session and ask Codex to summarize its vault context. The opt-in server sends a startup snapshot containing `wiki/tags.md`, `imprint.md`, the last 30 lines of `wiki/log.md`, and today's and yesterday's daily notes when present. Dates use the server's local timezone. Vault content is shared with the configured Codex session; only enable this for a vault you want to share with it.
