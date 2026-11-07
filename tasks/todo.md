@@ -4,7 +4,7 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 1. Store the scanned corpus and passages
 
-- [ ] Add a local experiment CLI to scan the vault, apply optional path exclusions, report page count and text volume, and store page metadata, source hashes, corpus version and deterministic bounded passages with source positions in a persistent DuckDB file. Keep data under an ignored local directory.
+- [x] Add a local experiment CLI to scan the vault, apply optional path exclusions, report page count and text volume, and store page metadata, source hashes, corpus version and deterministic bounded passages with source positions in a persistent DuckDB file. Keep data under an ignored local directory.
 - Acceptance: wiki and daily pages are included by default, exclusions work, source files remain unchanged, and SQL can inspect pages and passage provenance; a changed source changes the corpus version.
 - Dependencies: none. Files: `src/duckbrain/rag.py`, `src/duckbrain/__init__.py` if shared types are needed, `tests/test_rag.py`, `.gitignore`. Verification: `uv run pytest tests/test_rag.py -v` with a real temporary vault and database.
 
