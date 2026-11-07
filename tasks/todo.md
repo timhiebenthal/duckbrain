@@ -16,13 +16,13 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 3. Add Mistral embeddings and incremental indexing
 
-- [ ] Add a configurable Mistral embeddings client and persist vectors with passage hashes, model and chunk settings. Batch inputs; reuse unchanged embeddings; update new or changed passages and remove deleted or excluded passages. Preserve the last complete index on provider failures; changes in model or passage configuration trigger re-embedding.
+- [x] Add a configurable Mistral embeddings client and persist vectors with passage hashes, model and chunk settings. Batch inputs; reuse unchanged embeddings; update new or changed passages and remove deleted or excluded passages. Preserve the last complete index on provider failures; changes in model or passage configuration trigger re-embedding.
 - Acceptance: repeated indexing sends only required text; deleted passages cannot be retrieved; interrupted or failed runs leave no partial completed index. No credentials are needed by automated tests.
 - Dependencies: tasks 1–2. Files: `src/duckbrain/rag.py`, `src/duckbrain/rag_mistral.py`, `tests/test_rag.py`, `tests/test_rag_mistral.py`. Verification: focused tests using a local HTTP test service, real DuckDB and temporary vault.
 
 ## Checkpoint: indexing
 
-- [ ] Run `uv run pytest` and manually inspect the database schema and passage metadata from a temporary vault. Confirm no external requests occur in automated tests.
+- [x] Run `uv run pytest` and manually inspect the database schema and passage metadata from a temporary vault. Confirm no external requests occur in automated tests.
 
 ## 4. Compare ad hoc searches
 

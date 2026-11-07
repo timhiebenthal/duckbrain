@@ -3,10 +3,14 @@
 import argparse
 import hashlib
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import duckdb
 
+from duckbrain.rag_mistral import MistralClient
 from duckbrain.scanner import scan_vault
 
 
@@ -83,6 +87,73 @@ def search_bm25(database: Path, query: str, limit: int) -> list[dict]:
             [query, limit],
         ).fetchall()
     return [dict(zip(("id", "filepath", "title", "text", "score"), row)) for row in rows]
+
+
+def index_vault(
+    vault: Path,
+    database: Path,
+    client: MistralClient,
+    model: str,
+    excludes: list[str] | None = None,
+    batch_size: int = 32,
+) -> None:
+    """Build an index privately, then publish it only after all embeddings succeed."""
+    if batch_size < 1:
+        raise ValueError("Batch size must be positive")
+    database.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=".rag-index-", suffix=".duckdb", dir=database.parent)
+    os.close(fd)
+    temporary = Path(name)
+    try:
+        if database.exists():
+            shutil.copyfile(database, temporary)
+        else:
+            temporary.unlink()
+        store_corpus(vault, temporary, excludes)
+        with duckdb.connect(str(temporary)) as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS embedding_cache (hash VARCHAR, model VARCHAR, "
+                "config VARCHAR, vector FLOAT[])"
+            )
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS embeddings (id VARCHAR, filepath VARCHAR, "
+                "hash VARCHAR, model VARCHAR, config VARCHAR, vector FLOAT[])"
+            )
+            passages = conn.execute(
+                "SELECT id, filepath, text FROM passages ORDER BY id"
+            ).fetchall()
+            cached = {
+                row[0]: row[1]
+                for row in conn.execute(
+                    "SELECT hash, vector FROM embedding_cache WHERE model = ? AND config = ?",
+                    [model, "chars:1000"],
+                ).fetchall()
+            }
+            missing = {}
+            for _, _, text in passages:
+                digest = hashlib.sha256(text.encode()).hexdigest()
+                if digest not in cached:
+                    missing[digest] = text
+            items = list(missing.items())
+            for start in range(0, len(items), batch_size):
+                batch = items[start : start + batch_size]
+                vectors = client.embed([text for _, text in batch], model)
+                for (digest, _), vector in zip(batch, vectors):
+                    cached[digest] = vector
+                    conn.execute(
+                        "INSERT INTO embedding_cache VALUES (?, ?, ?, ?)",
+                        [digest, model, "chars:1000", vector],
+                    )
+            conn.execute("DELETE FROM embeddings")
+            for id_, filepath, text in passages:
+                digest = hashlib.sha256(text.encode()).hexdigest()
+                conn.execute(
+                    "INSERT INTO embeddings VALUES (?, ?, ?, ?, ?, ?)",
+                    [id_, filepath, digest, model, "chars:1000", cached[digest]],
+                )
+        os.replace(temporary, database)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main() -> None:
