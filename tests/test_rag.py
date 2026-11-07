@@ -25,3 +25,17 @@ def test_store_corpus_tracks_sources_exclusions_and_versions(temp_vault: Path, t
     store_corpus(temp_vault, db, excludes=["wiki/sources"])
     with duckdb.connect(str(db)) as conn:
         assert conn.execute("SELECT corpus_version FROM corpus").fetchone()[0] != version
+
+
+def test_bm25_search_uses_current_passages(temp_vault: Path, tmp_path: Path):
+    from duckbrain.rag import search_bm25
+
+    db = tmp_path / "rag.duckdb"
+    store_corpus(temp_vault, db)
+    hits = search_bm25(db, "taxonomy", 1)
+    assert len(hits) == 1
+    assert hits[0]["filepath"] == "wiki/concepts/agent-memory-systems.md"
+    assert hits[0]["score"] > 0
+    (temp_vault / hits[0]["filepath"]).unlink()
+    store_corpus(temp_vault, db)
+    assert search_bm25(db, "taxonomy", 10) == []

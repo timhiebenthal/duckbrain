@@ -10,7 +10,7 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 2. Build passage BM25 retrieval
 
-- [ ] Create a persistent DuckDB FTS index over passage title, tags and text using the existing indexer's configuration; return ranked passages with source paths and scores. Rebuild the index when the corpus changes.
+- [x] Create a persistent DuckDB FTS index over passage title, tags and text using the existing indexer's configuration; return ranked passages with source paths and scores. Rebuild the index when the corpus changes.
 - Acceptance: a query returns a relevant source passage from the stored corpus, honors the limit, and does not return removed passages after rebuilding.
 - Dependencies: task 1. Files: `src/duckbrain/rag.py`, `tests/test_rag.py`. Verification: focused tests with real DuckDB FTS, then `uv run pytest`.
 

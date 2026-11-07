@@ -61,6 +61,28 @@ def store_corpus(vault: Path, database: Path, excludes: list[str] | None = None)
         except Exception:
             conn.execute("ROLLBACK")
             raise
+        conn.execute("INSTALL fts")
+        conn.execute("LOAD fts")
+        conn.execute("DROP TABLE IF EXISTS passage_search")
+        conn.execute(
+            "CREATE TABLE passage_search AS SELECT s.id, s.filepath, p.title, p.tags, "
+            "s.text FROM passages s JOIN pages p USING (filepath)"
+        )
+        conn.execute(
+            "PRAGMA create_fts_index('passage_search', 'id', 'title', 'tags', 'text', overwrite=1)"
+        )
+
+
+def search_bm25(database: Path, query: str, limit: int) -> list[dict]:
+    """Return passage-level BM25 results from the current corpus."""
+    with duckdb.connect(str(database)) as conn:
+        rows = conn.execute(
+            "SELECT id, filepath, title, text, score FROM ("
+            "SELECT *, fts_main_passage_search.match_bm25(id, ?) AS score "
+            "FROM passage_search) WHERE score IS NOT NULL ORDER BY score DESC, id LIMIT ?",
+            [query, limit],
+        ).fetchall()
+    return [dict(zip(("id", "filepath", "title", "text", "score"), row)) for row in rows]
 
 
 def main() -> None:
