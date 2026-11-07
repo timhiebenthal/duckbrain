@@ -39,3 +39,31 @@ def test_bm25_search_uses_current_passages(temp_vault: Path, tmp_path: Path):
     (temp_vault / hits[0]["filepath"]).unlink()
     store_corpus(temp_vault, db)
     assert search_bm25(db, "taxonomy", 10) == []
+
+
+def test_graph_resolves_links_and_preserves_missing_targets(temp_vault: Path, tmp_path: Path):
+    db = tmp_path / "rag.duckdb"
+    daily = temp_vault / "daily/2026-05-28.md"
+    daily.write_text("[[Claude Mem#Notes|memory]] [[missing|alias]]")
+    entity = temp_vault / "wiki/entities/claude-mem.md"
+    entity.write_text(entity.read_text() + "\n[[Jagged Frontier]]")
+    store_corpus(temp_vault, db)
+    with duckdb.connect(str(db)) as conn:
+        rows = conn.execute(
+            "SELECT source_path, raw_target, target_path FROM edges ORDER BY source_path, raw_target"
+        ).fetchall()
+        assert ("daily/2026-05-28.md", "Claude Mem#Notes", "wiki/entities/claude-mem.md") in rows
+        assert ("daily/2026-05-28.md", "missing", None) in rows
+        assert (
+            "wiki/entities/claude-mem.md",
+            "Jagged Frontier",
+            "wiki/concepts/jagged-frontier.md",
+        ) in rows
+    store_corpus(temp_vault, db, excludes=["wiki/entities"])
+    with duckdb.connect(str(db)) as conn:
+        assert (
+            conn.execute(
+                "SELECT target_path FROM edges WHERE raw_target = 'Claude Mem#Notes'"
+            ).fetchone()[0]
+            is None
+        )

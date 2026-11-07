@@ -32,7 +32,7 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 5. Store and explore wiki links
 
-- [ ] Extract explicit wiki links, including alias and heading forms, into directed edges for indexed pages; retain the raw target and distinguish unresolved targets. Refresh edges as the corpus changes.
+- [x] Extract explicit wiki links, including alias and heading forms, into directed edges for indexed pages; retain the raw target and distinguish unresolved targets. Refresh edges as the corpus changes.
 - Acceptance: SQL can retrieve outgoing links, backlinks and two-hop connections; excluded or missing targets remain identifiable and do not create false resolved edges.
 - Dependencies: task 1; execute after task 4. Files: `src/duckbrain/rag.py`, `tests/test_rag.py`. Verification: focused tests with real temporary vault pages and DuckDB.
 

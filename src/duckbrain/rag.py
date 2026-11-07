@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import tempfile
 import uuid
@@ -40,11 +41,24 @@ def store_corpus(vault: Path, database: Path, excludes: list[str] | None = None)
             "position INTEGER, text VARCHAR)"
         )
         conn.execute("CREATE TABLE IF NOT EXISTS corpus (corpus_version VARCHAR)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS edges (source_path VARCHAR, raw_target VARCHAR, "
+            "target_path VARCHAR)"
+        )
         conn.execute("BEGIN")
         try:
             conn.execute("DELETE FROM pages")
             conn.execute("DELETE FROM passages")
             conn.execute("DELETE FROM corpus")
+            conn.execute("DELETE FROM edges")
+            targets: dict[str, set[str]] = {}
+            for page in pages:
+                for key in (
+                    page.title,
+                    Path(page.filepath).stem,
+                    page.filepath.removesuffix(".md"),
+                ):
+                    targets.setdefault(key.casefold(), set()).add(page.filepath)
             for page, (_, source_hash) in zip(pages, hashes):
                 conn.execute(
                     "INSERT INTO pages VALUES (?, ?, ?, ?, ?, ?)",
@@ -61,6 +75,16 @@ def store_corpus(vault: Path, database: Path, excludes: list[str] | None = None)
                     conn.execute(
                         "INSERT INTO passages VALUES (?, ?, ?, ?)",
                         [f"{page.filepath}:{pos}", page.filepath, pos, page.body[pos : pos + 1000]],
+                    )
+                for match in re.finditer(r"\[\[([^\]]+)\]\]", page.body):
+                    raw = match.group(1).split("|", 1)[0].strip()
+                    target = raw.split("#", 1)[0].strip().removesuffix(".md")
+                    candidates = (
+                        targets.get(target.casefold(), set()) if target else {page.filepath}
+                    )
+                    resolved = next(iter(candidates)) if len(candidates) == 1 else None
+                    conn.execute(
+                        "INSERT INTO edges VALUES (?, ?, ?)", [page.filepath, raw, resolved]
                     )
             conn.execute("INSERT INTO corpus VALUES (?)", [version])
             conn.execute("COMMIT")
