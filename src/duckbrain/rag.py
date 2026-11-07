@@ -251,6 +251,87 @@ def compare(database: Path, client: MistralClient, question: str, limit: int) ->
     return run_id, results
 
 
+ANSWER_INSTRUCTION = (
+    "Answer using only the supplied passages. Cite factual claims using [number] citations. "
+    "If evidence is insufficient, reply exactly: Insufficient evidence."
+)
+
+
+def answer_run(database: Path, client: MistralClient, run_id: str, model: str) -> dict:
+    """Generate and save answers with explicitly checked passage citations."""
+    if not model.strip():
+        raise ValueError("An answer model is required")
+    with duckdb.connect(str(database)) as conn:
+        row = conn.execute("SELECT question FROM runs WHERE id = ?", [run_id]).fetchone()
+        if row is None:
+            raise ValueError("Unknown comparison run")
+        answers = {}
+        for method in ("bm25", "embedding"):
+            rows = conn.execute(
+                "SELECT rank, passage_id, filepath, text FROM results "
+                "WHERE run_id = ? AND method = ? ORDER BY rank",
+                [run_id, method],
+            ).fetchall()
+            evidence = "\n\n".join(
+                f"[{rank}] {path} ({passage_id})\n{text}" for rank, passage_id, path, text in rows
+            )
+            prompt = f"{ANSWER_INSTRUCTION}\n\nQuestion: {row[0]}\n\nPassages:\n{evidence}"
+            response = client.post(
+                "chat/completions",
+                {
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0,
+                },
+            )
+            answer = response["choices"][0]["message"]["content"]
+            if not isinstance(answer, str):
+                raise ValueError("Provider returned an invalid answer")
+            citations = sorted({int(match) for match in re.findall(r"\[(\d+)\]", answer)})
+            available = {
+                rank: {"passage_id": passage_id, "filepath": path, "text": text}
+                for rank, passage_id, path, text in rows
+            }
+            invalid = [citation for citation in citations if citation not in available]
+            insufficient = answer.strip().casefold().rstrip(".") == "insufficient evidence"
+            valid = not invalid and (bool(citations) or insufficient)
+            answers[method] = {
+                "answer": answer,
+                "prompt": prompt,
+                "citations": citations,
+                "invalid_citations": invalid,
+                "valid": valid,
+                "cited_passages": [available[c] for c in citations if c in available],
+            }
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS answers (run_id VARCHAR, method VARCHAR, model VARCHAR, "
+            "prompt VARCHAR, answer VARCHAR, citations JSON, cited_passages JSON, "
+            "valid BOOLEAN, invalid_citations JSON)"
+        )
+        conn.execute("BEGIN")
+        try:
+            for method, answer in answers.items():
+                conn.execute(
+                    "INSERT INTO answers VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        run_id,
+                        method,
+                        model,
+                        answer["prompt"],
+                        answer["answer"],
+                        json.dumps(answer["citations"]),
+                        json.dumps(answer["cited_passages"]),
+                        answer["valid"],
+                        json.dumps(answer["invalid_citations"]),
+                    ],
+                )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    return answers
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Store an inspectable vault corpus")
     parser.add_argument("vault", type=Path)

@@ -21,6 +21,14 @@ def provider():
             if body.get("model") == "fail":
                 self.send_error(500)
                 return
+            if self.path.endswith("/chat/completions"):
+                content = "Answer [99]" if body.get("model") == "invalid" else "Answer [1]"
+                payload = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             data = [
                 {"index": i, "embedding": [float(len(text)), 1.0]}
                 for i, text in enumerate(body["input"])
@@ -128,3 +136,33 @@ def test_compare_rejects_missing_or_incomplete_index(temp_vault: Path, tmp_path:
     with pytest.raises(ValueError, match="incomplete"):
         compare(db, client, "question", 2)
     assert requests == []
+
+
+def test_answers_record_citations_and_reject_invalid_ids(
+    temp_vault: Path, tmp_path: Path, provider
+):
+    from duckbrain.rag import answer_run, compare
+
+    url, _ = provider
+    db = tmp_path / "rag.duckdb"
+    client = MistralClient("test", url)
+    index_vault(temp_vault, db, client, "embed")
+    run_id, _ = compare(db, client, "taxonomy", 2)
+    answers = answer_run(db, client, run_id, "chat")
+    assert set(answers) == {"bm25", "embedding"}
+    assert all(answer["valid"] and answer["citations"] == [1] for answer in answers.values())
+    with duckdb.connect(str(db)) as conn:
+        assert (
+            conn.execute("SELECT count(*) FROM answers WHERE run_id = ?", [run_id]).fetchone()[0]
+            == 2
+        )
+    invalid = answer_run(db, client, run_id, "invalid")
+    assert not any(answer["valid"] for answer in invalid.values())
+    assert all(answer["invalid_citations"] == [99] for answer in invalid.values())
+    with pytest.raises(Exception):
+        answer_run(db, client, run_id, "fail")
+    with duckdb.connect(str(db)) as conn:
+        assert (
+            conn.execute("SELECT count(*) FROM answers WHERE run_id = ?", [run_id]).fetchone()[0]
+            == 4
+        )

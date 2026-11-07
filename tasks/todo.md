@@ -38,7 +38,7 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 6. Generate and save grounded answers
 
-- [ ] Add configurable Mistral chat answer generation for each saved retrieval list, using the same model and prompt and passage IDs as citations. Save prompt, model, answers and cited passages; surface unsupported evidence and provider errors clearly.
+- [x] Add configurable Mistral chat answer generation for each saved retrieval list, using the same model and prompt and passage IDs as citations. Save prompt, model, answers and cited passages; surface unsupported evidence and provider errors clearly.
 - Acceptance: both methods produce independently inspectable answers with citations to retrieved passages or an insufficient-evidence response; invalid citations are reported, not silently presented as verified.
 - Dependencies: task 4. Files: `src/duckbrain/rag.py`, `src/duckbrain/rag_mistral.py`, `tests/test_rag.py`, `tests/test_rag_mistral.py`. Verification: local HTTP test service and real DuckDB tests cover both retrieval lists, invalid citations and provider errors.
 
