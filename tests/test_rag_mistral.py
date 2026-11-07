@@ -92,3 +92,39 @@ def test_model_changes_and_exclusions(temp_vault: Path, tmp_path: Path, provider
         assert {r[0] for r in conn.execute("SELECT DISTINCT model FROM embeddings").fetchall()} == {
             "second"
         }
+
+
+def test_compare_persists_both_rankings(temp_vault: Path, tmp_path: Path, provider):
+    from duckbrain.rag import compare
+
+    url, _ = provider
+    db = tmp_path / "rag.duckdb"
+    client = MistralClient("test", url)
+    index_vault(temp_vault, db, client, "model")
+    run_id, results = compare(db, client, "taxonomy", 2)
+    assert set(results) == {"bm25", "embedding"}
+    assert results["bm25"][0]["filepath"] == "wiki/concepts/agent-memory-systems.md"
+    assert len(results["embedding"]) == 2
+    with duckdb.connect(str(db)) as conn:
+        assert conn.execute(
+            "SELECT question, model FROM runs WHERE id = ?", [run_id]
+        ).fetchone() == ("taxonomy", "model")
+        rows = conn.execute(
+            "SELECT method, text, filepath, score FROM results WHERE run_id = ?", [run_id]
+        ).fetchall()
+        assert {row[0] for row in rows} == {"bm25", "embedding"}
+        assert all(row[1] and row[2] and row[3] is not None for row in rows)
+
+
+def test_compare_rejects_missing_or_incomplete_index(temp_vault: Path, tmp_path: Path, provider):
+    from duckbrain.rag import compare, store_corpus
+
+    url, requests = provider
+    client = MistralClient("test", url)
+    db = tmp_path / "missing.duckdb"
+    with pytest.raises(ValueError, match="Index"):
+        compare(db, client, "question", 2)
+    store_corpus(temp_vault, db)
+    with pytest.raises(ValueError, match="incomplete"):
+        compare(db, client, "question", 2)
+    assert requests == []

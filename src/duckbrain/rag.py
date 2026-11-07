@@ -3,9 +3,11 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import tempfile
+import uuid
 from pathlib import Path
 
 import duckdb
@@ -154,6 +156,75 @@ def index_vault(
         os.replace(temporary, database)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def compare(database: Path, client: MistralClient, question: str, limit: int) -> tuple[str, dict]:
+    """Save BM25 and exact cosine rankings for one question and corpus."""
+    if not database.exists():
+        raise ValueError("Index does not exist; run indexing first")
+    if not question.strip() or limit < 1:
+        raise ValueError("A question and positive limit are required")
+    with duckdb.connect(str(database)) as conn:
+        try:
+            settings = conn.execute("SELECT DISTINCT model, config FROM embeddings").fetchall()
+            version_row = conn.execute("SELECT corpus_version FROM corpus").fetchone()
+        except duckdb.Error as exc:
+            raise ValueError("Index is incomplete; run indexing first") from exc
+        if len(settings) != 1 or not version_row:
+            raise ValueError("Index is incomplete or empty; run indexing first")
+        model, config = settings[0]
+        query_vector = client.embed([question], model)[0]
+        rows = conn.execute(
+            "SELECT e.id, e.filepath, p.title, s.text, e.vector FROM embeddings e "
+            "JOIN passages s ON e.id = s.id JOIN pages p ON e.filepath = p.filepath"
+        ).fetchall()
+        scored = []
+        for id_, filepath, title, text, vector in rows:
+            if len(vector) != len(query_vector):
+                raise ValueError("Embedding dimensions do not match")
+            denominator = math.sqrt(sum(x * x for x in vector) * sum(x * x for x in query_vector))
+            if not denominator:
+                raise ValueError("Cannot compare a zero embedding")
+            score = sum(x * y for x, y in zip(vector, query_vector)) / denominator
+            scored.append(dict(id=id_, filepath=filepath, title=title, text=text, score=score))
+        scored.sort(key=lambda item: (-item["score"], item["id"]))
+        bm25 = search_bm25(database, question, limit)
+        results = {"bm25": bm25, "embedding": scored[:limit]}
+        run_id = uuid.uuid4().hex
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS runs (id VARCHAR, question VARCHAR, model VARCHAR, "
+            "config VARCHAR, corpus_version VARCHAR, result_limit INTEGER)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS results (run_id VARCHAR, method VARCHAR, rank INTEGER, "
+            "passage_id VARCHAR, filepath VARCHAR, title VARCHAR, text VARCHAR, score DOUBLE)"
+        )
+        conn.execute("BEGIN")
+        try:
+            conn.execute(
+                "INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)",
+                [run_id, question, model, config, version_row[0], limit],
+            )
+            for method, hits in results.items():
+                for rank, hit in enumerate(hits, 1):
+                    conn.execute(
+                        "INSERT INTO results VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        [
+                            run_id,
+                            method,
+                            rank,
+                            hit["id"],
+                            hit["filepath"],
+                            hit["title"],
+                            hit["text"],
+                            hit["score"],
+                        ],
+                    )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    return run_id, results
 
 
 def main() -> None:

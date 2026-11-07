@@ -26,7 +26,7 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 4. Compare ad hoc searches
 
-- [ ] Embed a user question with the configured Mistral model; rank stored vectors using cosine similarity and run BM25 against the same corpus and result limit. Display and persist both lists, passage text, source paths, scores, question, corpus version and retrieval settings.
+- [x] Embed a user question with the configured Mistral model; rank stored vectors using cosine similarity and run BM25 against the same corpus and result limit. Display and persist both lists, passage text, source paths, scores, question, corpus version and retrieval settings.
 - Acceptance: one question produces side-by-side results and a saved run that can be inspected in SQL; missing credentials or an unavailable/incomplete index produces a clear error.
 - Dependencies: tasks 2–3. Files: `src/duckbrain/rag.py`, `src/duckbrain/rag_mistral.py`, `tests/test_rag.py`. Verification: focused end-to-end tests with a local HTTP test service and real DuckDB.
 
