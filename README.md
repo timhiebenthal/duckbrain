@@ -327,3 +327,7 @@ cd duckbrain
 uv sync
 uv run duckbrain  # will hang waiting on stdio — that's correct
 ```
+
+## Vault RAG experiment
+
+The optional local experiment compares passage BM25 with Mistral embeddings, stores wiki links, and saves grounded answers for inspection. It does not change the MCP server. See [the RAG experiment guide](docs/rag-experiment.md) for data handling, commands, and SQL examples.

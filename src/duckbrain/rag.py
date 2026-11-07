@@ -13,23 +13,32 @@ from pathlib import Path
 
 import duckdb
 
+from duckbrain import PageMetadata
 from duckbrain.rag_mistral import MistralClient
 from duckbrain.scanner import scan_vault
 
 
-def store_corpus(vault: Path, database: Path, excludes: list[str] | None = None) -> None:
-    """Persist scanner-visible pages and bounded passages without modifying the vault."""
+def select_pages(vault: Path, excludes: list[str] | None = None) -> list[PageMetadata]:
+    """Select and report the pages that would be sent for embedding."""
+    if not vault.is_dir():
+        raise ValueError("Vault directory does not exist")
     excluded = [p.rstrip("/") for p in (excludes or [])]
     pages = [
         p
         for p in scan_vault(str(vault))
         if not any(p.filepath == x or p.filepath.startswith(x + "/") for x in excluded)
     ]
+    print(f"Pages: {len(pages)}; text characters: {sum(len(p.body) for p in pages)}", flush=True)
+    return pages
+
+
+def store_corpus(vault: Path, database: Path, excludes: list[str] | None = None) -> None:
+    """Persist scanner-visible pages and bounded passages without modifying the vault."""
+    pages = select_pages(vault, excludes)
     hashes = [
         (p.filepath, hashlib.sha256((vault / p.filepath).read_bytes()).hexdigest()) for p in pages
     ]
     version = hashlib.sha256(json.dumps(hashes).encode()).hexdigest()
-    print(f"Pages: {len(pages)}; text characters: {sum(len(p.body) for p in pages)}")
     database.parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(database)) as conn:
         conn.execute(
@@ -333,12 +342,42 @@ def answer_run(database: Path, client: MistralClient, run_id: str, model: str) -
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Store an inspectable vault corpus")
-    parser.add_argument("vault", type=Path)
-    parser.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
-    parser.add_argument("--exclude", action="append", default=[])
+    parser = argparse.ArgumentParser(description="Inspect and compare vault retrieval")
+    sub = parser.add_subparsers(dest="command", required=True)
+    preview = sub.add_parser("preview", help="Report selected pages without a provider call")
+    preview.add_argument("vault", type=Path)
+    preview.add_argument("--exclude", action="append", default=[])
+    index = sub.add_parser("index", help="Index vault and send passages to Mistral")
+    index.add_argument("vault", type=Path)
+    index.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
+    index.add_argument("--exclude", action="append", default=[])
+    index.add_argument("--model", default="mistral-embed")
+    index.add_argument("--batch-size", type=int, default=32)
+    search = sub.add_parser("compare", help="Compare BM25 and embeddings")
+    search.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
+    search.add_argument("--question", required=True)
+    search.add_argument("--limit", type=int, default=10)
+    answer = sub.add_parser("answer", help="Send retrieved passages to Mistral chat")
+    answer.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
+    answer.add_argument("--run", required=True)
+    answer.add_argument("--model", required=True)
     args = parser.parse_args()
-    store_corpus(args.vault, args.database, args.exclude)
+    if args.command == "preview":
+        select_pages(args.vault, args.exclude)
+        return
+    client = MistralClient(
+        os.environ.get("MISTRAL_API_KEY", ""),
+        os.environ.get("MISTRAL_BASE_URL", "https://api.mistral.ai/v1"),
+    )
+    if args.command == "index":
+        if args.database.resolve().is_relative_to(args.vault.resolve()):
+            parser.error("Database must be outside the vault")
+        index_vault(args.vault, args.database, client, args.model, args.exclude, args.batch_size)
+    elif args.command == "compare":
+        run_id, results = compare(args.database, client, args.question, args.limit)
+        print(json.dumps({"run_id": run_id, "results": results}, indent=2))
+    else:
+        print(json.dumps(answer_run(args.database, client, args.run, args.model), indent=2))
 
 
 if __name__ == "__main__":

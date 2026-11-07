@@ -44,10 +44,10 @@ All tasks are sequential and use test-first development. Owner: the implementati
 
 ## 7. Document and verify the workflow
 
-- [ ] Document environment setup and complete commands for indexing, incremental updates, exclusions, comparison, answers and SQL exploration. Explain Mistral data transfer and the difference between page-level DuckBrain BM25 and passage-level experiment BM25.
+- [x] Document environment setup and complete commands for indexing, incremental updates, exclusions, comparison, answers and SQL exploration. Explain Mistral data transfer and the difference between page-level DuckBrain BM25 and passage-level experiment BM25.
 - Acceptance: a reader can follow the workflow using their own vault and key; SQL examples cover pages, vectors, results, outgoing links, backlinks and two hops; generated data stays ignored.
 - Dependencies: tasks 1–6. Files: `README.md`, `docs/rag-experiment.md`, tests only if documentation exposes behavior needing a check. Verification: exercise documented workflow against a temporary vault and local HTTP test service; run `git diff --check` and inspect `git status`.
 
 ## Final checkpoint
 
-- [ ] Run `uv run ruff check src/duckbrain/`, `uv run ruff format --check src/duckbrain/`, `uv run mypy src/duckbrain/`, and `uv run pytest`. Report whether a real Mistral smoke test was performed and its limitations.
+- [x] Run `uv run ruff check src/duckbrain/`, `uv run ruff format --check src/duckbrain/`, `uv run mypy src/duckbrain/`, and `uv run pytest`. Report whether a real Mistral smoke test was performed and its limitations.

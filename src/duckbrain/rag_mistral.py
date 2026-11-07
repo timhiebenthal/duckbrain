@@ -1,6 +1,7 @@
 """Minimal Mistral HTTP client for the local RAG experiment."""
 
 import json
+import math
 import urllib.request
 from typing import Any
 
@@ -31,6 +32,20 @@ class MistralClient:
         data = self.post("embeddings", {"model": model, "input": texts})["data"]
         data = sorted(data, key=lambda row: row["index"])
         vectors = [row["embedding"] for row in data]
-        if len(vectors) != len(texts) or any(not v for v in vectors):
+        if (
+            [row["index"] for row in data] != list(range(len(texts)))
+            or any(
+                not isinstance(vector, list)
+                or not vector
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(value)
+                    for value in vector
+                )
+                for vector in vectors
+            )
+            or len({len(vector) for vector in vectors}) > 1
+        ):
             raise ValueError("Provider returned an invalid embedding batch")
         return vectors

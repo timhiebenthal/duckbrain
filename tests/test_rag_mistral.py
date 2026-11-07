@@ -29,6 +29,13 @@ def provider():
                 self.end_headers()
                 self.wfile.write(payload)
                 return
+            if body.get("model") == "bad-vector":
+                payload = json.dumps({"data": [{"index": 0, "embedding": ["bad"]}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             data = [
                 {"index": i, "embedding": [float(len(text)), 1.0]}
                 for i, text in enumerate(body["input"])
@@ -102,6 +109,18 @@ def test_model_changes_and_exclusions(temp_vault: Path, tmp_path: Path, provider
         }
 
 
+def test_invalid_provider_vectors_do_not_replace_index(temp_vault: Path, tmp_path: Path, provider):
+    url, _ = provider
+    db = tmp_path / "rag.duckdb"
+    client = MistralClient("test", url)
+    index_vault(temp_vault, db, client, "valid")
+    with pytest.raises(ValueError, match="embedding"):
+        index_vault(temp_vault, db, client, "bad-vector", batch_size=1)
+    with duckdb.connect(str(db)) as conn:
+        rows = conn.execute("SELECT DISTINCT model FROM embeddings").fetchall()
+        assert {row[0] for row in rows} == {"valid"}
+
+
 def test_compare_persists_both_rankings(temp_vault: Path, tmp_path: Path, provider):
     from duckbrain.rag import compare
 
@@ -166,3 +185,37 @@ def test_answers_record_citations_and_reject_invalid_ids(
             conn.execute("SELECT count(*) FROM answers WHERE run_id = ?", [run_id]).fetchone()[0]
             == 4
         )
+
+
+def test_cli_workflow(temp_vault: Path, tmp_path: Path, provider):
+    import os
+    import subprocess
+    import sys
+
+    url, _ = provider
+    db = tmp_path / "cli.duckdb"
+    env = {**os.environ, "MISTRAL_API_KEY": "test", "MISTRAL_BASE_URL": url}
+
+    def run(*args):
+        return subprocess.run(
+            [sys.executable, "-m", "duckbrain.rag", *args],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+    preview = run("preview", str(temp_vault), "--exclude", "daily")
+    assert "Pages: 5" in preview.stdout
+    assert not db.exists()
+    assert not provider[1]
+
+    indexed = run(
+        "index", str(temp_vault), "--database", str(db), "--model", "embed", "--exclude", "daily"
+    )
+    assert "Pages:" in indexed.stdout
+    compared = run("compare", "--database", str(db), "--question", "taxonomy", "--limit", "2")
+    result = json.loads(compared.stdout)
+    assert result["results"]["bm25"][0]["filepath"].endswith("agent-memory-systems.md")
+    answered = run("answer", "--database", str(db), "--run", result["run_id"], "--model", "chat")
+    assert json.loads(answered.stdout)["bm25"]["valid"]
