@@ -17,6 +17,7 @@ import duckdb
 
 from duckbrain import PageMetadata
 from duckbrain.indexer import build_fts_index
+from duckbrain.indexer import search as classic_search
 from duckbrain.rag_mistral import MistralClient
 from duckbrain.scanner import scan_vault
 
@@ -212,38 +213,46 @@ def index_vault(
         temporary.unlink(missing_ok=True)
 
 
+def embedding_search(
+    conn: duckdb.DuckDBPyConnection, client: MistralClient, question: str, limit: int
+) -> tuple[list[dict], str, str, str]:
+    """Rank indexed passages by cosine similarity to the question."""
+    if not question.strip() or limit < 1:
+        raise ValueError("A question and positive limit are required")
+    try:
+        settings = conn.execute("SELECT DISTINCT model, config FROM embeddings").fetchall()
+        version_row = conn.execute("SELECT corpus_version FROM corpus").fetchone()
+    except duckdb.Error as exc:
+        raise ValueError("Index is incomplete; run indexing first") from exc
+    if len(settings) != 1 or not version_row:
+        raise ValueError("Index is incomplete or empty; run indexing first")
+    model, config = settings[0]
+    query_vector = client.embed([question], model)[0]
+    rows = conn.execute(
+        "SELECT e.id, e.filepath, p.title, s.text, e.vector FROM embeddings e "
+        "JOIN passages s ON e.id = s.id JOIN pages p ON e.filepath = p.filepath"
+    ).fetchall()
+    scored = []
+    for id_, filepath, title, text, vector in rows:
+        if len(vector) != len(query_vector):
+            raise ValueError("Embedding dimensions do not match")
+        denominator = math.sqrt(sum(x * x for x in vector) * sum(x * x for x in query_vector))
+        if not denominator:
+            raise ValueError("Cannot compare a zero embedding")
+        score = sum(x * y for x, y in zip(vector, query_vector)) / denominator
+        scored.append(dict(id=id_, filepath=filepath, title=title, text=text, score=score))
+    scored.sort(key=lambda item: (-item["score"], item["id"]))
+    return scored[:limit], model, config, version_row[0]
+
+
 def compare(database: Path, client: MistralClient, question: str, limit: int) -> tuple[str, dict]:
     """Save BM25 and exact cosine rankings for one question and corpus."""
     if not database.exists():
         raise ValueError("Index does not exist; run indexing first")
-    if not question.strip() or limit < 1:
-        raise ValueError("A question and positive limit are required")
     with duckdb.connect(str(database)) as conn:
-        try:
-            settings = conn.execute("SELECT DISTINCT model, config FROM embeddings").fetchall()
-            version_row = conn.execute("SELECT corpus_version FROM corpus").fetchone()
-        except duckdb.Error as exc:
-            raise ValueError("Index is incomplete; run indexing first") from exc
-        if len(settings) != 1 or not version_row:
-            raise ValueError("Index is incomplete or empty; run indexing first")
-        model, config = settings[0]
-        query_vector = client.embed([question], model)[0]
-        rows = conn.execute(
-            "SELECT e.id, e.filepath, p.title, s.text, e.vector FROM embeddings e "
-            "JOIN passages s ON e.id = s.id JOIN pages p ON e.filepath = p.filepath"
-        ).fetchall()
-        scored = []
-        for id_, filepath, title, text, vector in rows:
-            if len(vector) != len(query_vector):
-                raise ValueError("Embedding dimensions do not match")
-            denominator = math.sqrt(sum(x * x for x in vector) * sum(x * x for x in query_vector))
-            if not denominator:
-                raise ValueError("Cannot compare a zero embedding")
-            score = sum(x * y for x, y in zip(vector, query_vector)) / denominator
-            scored.append(dict(id=id_, filepath=filepath, title=title, text=text, score=score))
-        scored.sort(key=lambda item: (-item["score"], item["id"]))
+        scored, model, config, version = embedding_search(conn, client, question, limit)
         bm25 = search_bm25(database, question, limit)
-        results = {"bm25": bm25, "embedding": scored[:limit]}
+        results = {"bm25": bm25, "embedding": scored}
         run_id = uuid.uuid4().hex
         conn.execute(
             "CREATE TABLE IF NOT EXISTS runs (id VARCHAR, question VARCHAR, model VARCHAR, "
@@ -257,7 +266,7 @@ def compare(database: Path, client: MistralClient, question: str, limit: int) ->
         try:
             conn.execute(
                 "INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)",
-                [run_id, question, model, config, version_row[0], limit],
+                [run_id, question, model, config, version, limit],
             )
             for method, hits in results.items():
                 for rank, hit in enumerate(hits, 1):
@@ -387,6 +396,11 @@ def main() -> None:
     search.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
     search.add_argument("--question", required=True)
     search.add_argument("--limit", type=int, default=10)
+    ab = sub.add_parser("ab", help="Compare classic page search with embedding retrieval")
+    ab.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
+    ab.add_argument("--classic-database", type=Path, default=Path(".rag/classic.duckdb"))
+    ab.add_argument("--question", help="Question to compare; prompts if omitted")
+    ab.add_argument("--limit", type=int, default=5)
     answer = sub.add_parser("answer", help="Send retrieved passages to Mistral chat")
     answer.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
     answer.add_argument("--run", required=True)
@@ -433,6 +447,26 @@ def main() -> None:
     elif args.command == "compare":
         run_id, results = compare(args.database, client, args.question, args.limit)
         print(json.dumps({"run_id": run_id, "results": results}, indent=2))
+    elif args.command == "ab":
+        question = args.question if args.question is not None else input("Question: ")
+        if not question.strip() or args.limit < 1:
+            parser.error("A question and positive limit are required")
+        if not args.classic_database.is_file() or not args.database.is_file():
+            parser.error("Both classic and RAG databases must exist")
+        with duckdb.connect(str(args.classic_database), read_only=True) as conn:
+            classic_results = classic_search(conn, question, limit=args.limit)
+        with duckdb.connect(str(args.database), read_only=True) as conn:
+            embedding_results, _, _, _ = embedding_search(conn, client, question, args.limit)
+        for label, hits, text_field in (
+            ("Classic (page BM25)", classic_results, "snippet"),
+            ("Embedding (passage cosine)", embedding_results, "text"),
+        ):
+            print(f"\n{label}")
+            if not hits:
+                print("  No results")
+            for rank, hit in enumerate(hits, 1):
+                print(f"\n{rank}. {hit['title']} ({hit['filepath']})")
+                print(f"   Score: {hit['score']:.4f}\n   {hit[text_field]}")
     else:
         print(json.dumps(answer_run(args.database, client, args.run, args.model), indent=2))
 

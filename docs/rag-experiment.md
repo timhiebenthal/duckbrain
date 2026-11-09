@@ -27,6 +27,16 @@ The count and text volume are printed before embedding. Embedding requests are s
 
 ## Compare and answer
 
+Compare the classic page search against embedding retrieval directly:
+
+```bash
+uv run python -m duckbrain.rag ab
+```
+
+Enter a question at the prompt, or pass `--question 'your question'`. Use `--limit 5` to set the number of results per method. The command reads `.rag/classic.duckdb` and `.rag/corpus.duckdb`; override them with `--classic-database` and `--database` if needed. It sends the question to Mistral for one embedding and prints the results without saving a run. The classic index is a snapshot; rebuild it to a new path if the vault has changed. BM25 and cosine scores have different scales.
+
+For passage-level BM25 versus embedding retrieval, with results saved in the database:
+
 ```bash
 uv run python -m duckbrain.rag compare --question 'How is agent memory organized?' --limit 5
 uv run python -m duckbrain.rag answer --run RUN_ID_FROM_COMPARE --model YOUR_MISTRAL_CHAT_MODEL

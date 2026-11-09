@@ -239,6 +239,47 @@ def test_classic_snapshot_cli(temp_vault: Path, tmp_path: Path):
         assert conn.execute("SELECT count(*) FROM pages").fetchone()[0] == 6
 
 
+def test_ab_cli_prompts_and_compares_classic_with_embeddings(
+    temp_vault: Path, tmp_path: Path, provider
+):
+    import os
+    import subprocess
+    import sys
+
+    from duckbrain.indexer import build_fts_index
+    from duckbrain.scanner import scan_vault
+
+    url, requests = provider
+    classic = tmp_path / "classic.duckdb"
+    rag = tmp_path / "rag.duckdb"
+    build_fts_index(scan_vault(str(temp_vault)), classic).close()
+    index_vault(temp_vault, rag, MistralClient("test", url), "embed")
+    requests.clear()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "duckbrain.rag",
+            "ab",
+            "--classic-database",
+            str(classic),
+            "--database",
+            str(rag),
+            "--limit",
+            "2",
+        ],
+        input="taxonomy\n",
+        text=True,
+        capture_output=True,
+        check=True,
+        env={**os.environ, "MISTRAL_API_KEY": "test", "MISTRAL_BASE_URL": url},
+    )
+    assert "Classic" in result.stdout
+    assert "Embedding" in result.stdout
+    assert "agent-memory-systems.md" in result.stdout
+    assert len(requests) == 1 and requests[0]["input"] == ["taxonomy"]
+
+
 def test_cli_workflow(temp_vault: Path, tmp_path: Path, provider):
     import os
     import subprocess
