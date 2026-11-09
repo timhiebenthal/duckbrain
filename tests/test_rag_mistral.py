@@ -211,6 +211,34 @@ def test_answers_record_citations_and_reject_invalid_ids(
         )
 
 
+def test_classic_snapshot_cli(temp_vault: Path, tmp_path: Path):
+    import os
+    import subprocess
+    import sys
+
+    db = tmp_path / "classic.duckdb"
+    env = {key: value for key, value in os.environ.items() if key != "MISTRAL_API_KEY"}
+    result = subprocess.run(
+        [sys.executable, "-m", "duckbrain.rag", "classic", str(temp_vault), "--database", str(db)],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "Pages:" in result.stdout
+    with duckdb.connect(str(db), read_only=True) as conn:
+        assert conn.execute("SELECT count(*) FROM pages").fetchone()[0] == 6
+    second = subprocess.run(
+        [sys.executable, "-m", "duckbrain.rag", "classic", str(temp_vault), "--database", str(db)],
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    assert second.returncode != 0
+    with duckdb.connect(str(db), read_only=True) as conn:
+        assert conn.execute("SELECT count(*) FROM pages").fetchone()[0] == 6
+
+
 def test_cli_workflow(temp_vault: Path, tmp_path: Path, provider):
     import os
     import subprocess

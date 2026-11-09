@@ -16,6 +16,7 @@ from pathlib import Path
 import duckdb
 
 from duckbrain import PageMetadata
+from duckbrain.indexer import build_fts_index
 from duckbrain.rag_mistral import MistralClient
 from duckbrain.scanner import scan_vault
 
@@ -367,6 +368,9 @@ def main() -> None:
     preview = sub.add_parser("preview", help="Report selected pages without a provider call")
     preview.add_argument("vault", type=Path)
     preview.add_argument("--exclude", action="append", default=[])
+    classic = sub.add_parser("classic", help="Save a classic page-level search index")
+    classic.add_argument("vault", type=Path)
+    classic.add_argument("--database", type=Path, default=Path(".rag/classic.duckdb"))
     index = sub.add_parser("index", help="Index vault and send passages to Mistral")
     index.add_argument("vault", type=Path)
     index.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
@@ -390,6 +394,25 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "preview":
         select_pages(args.vault, args.exclude)
+        return
+    if args.command == "classic":
+        if args.database.resolve().is_relative_to(args.vault.resolve()):
+            parser.error("Database must be outside the vault")
+        if args.database.exists():
+            parser.error("Database already exists; choose a new path")
+        pages = select_pages(args.vault)
+        args.database.parent.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(
+            prefix=".classic-index-", suffix=".duckdb", dir=args.database.parent
+        )
+        os.close(fd)
+        temporary = Path(name)
+        temporary.unlink()
+        try:
+            build_fts_index(pages, temporary).close()
+            os.link(temporary, args.database)
+        finally:
+            temporary.unlink(missing_ok=True)
         return
     client = MistralClient(
         os.environ.get("MISTRAL_API_KEY", ""),

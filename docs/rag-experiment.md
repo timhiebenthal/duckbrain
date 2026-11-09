@@ -36,6 +36,23 @@ Comparison prints JSON with `run_id` and the two ranked lists. Both lists use th
 
 ## Inspect with SQL
 
+Save a separate snapshot of the classic page-level index (no API key or provider call required):
+
+```bash
+uv run python -m duckbrain.rag classic "$VAULT_PATH"
+```
+
+This writes `.rag/classic.duckdb` and refuses to overwrite an existing file. It is a snapshot, so use a new path to capture later vault changes. Normal MCP searches still build their own in-memory index. Both database files contain private vault text and are ignored by Git.
+
+To inspect both databases in the DuckDB UI, run `duckdb -ui` from the repository root and run these commands in a UI notebook:
+
+```sql
+ATTACH '.rag/classic.duckdb' AS classic (READ_ONLY);
+ATTACH '.rag/corpus.duckdb' AS rag (READ_ONLY);
+SELECT count(*) FROM classic.pages;
+SELECT count(*) FROM rag.embeddings;
+```
+
 Open the database with a DuckDB client, or use Python:
 
 ```bash

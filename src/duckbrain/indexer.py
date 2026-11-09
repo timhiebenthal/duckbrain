@@ -1,5 +1,6 @@
 """DuckDB FTS index build, search, and stats for DuckBrain."""
 
+from pathlib import Path
 from typing import Any
 
 import duckdb
@@ -40,14 +41,16 @@ def _extract_snippet(body: str, query: str, context: int = 100) -> str:
     return f"{prefix}{snippet}{suffix}"
 
 
-def build_fts_index(pages: list[PageMetadata]) -> duckdb.DuckDBPyConnection:
-    """Build a DuckDB in-memory FTS index from a list of PageMetadata.
+def build_fts_index(
+    pages: list[PageMetadata], database: Path | None = None
+) -> duckdb.DuckDBPyConnection:
+    """Build a DuckDB FTS index from a list of PageMetadata.
 
-    Creates an in-memory DuckDB connection, creates a ``pages`` table,
+    Creates an in-memory connection by default, creates a ``pages`` table,
     inserts all pages, and builds an FTS index on title, tags, and body.
     Returns the connection (caller must close it).
     """
-    conn = duckdb.connect(":memory:")
+    conn = duckdb.connect(str(database) if database is not None else ":memory:")
 
     # Load FTS extension
     conn.execute("INSTALL fts")

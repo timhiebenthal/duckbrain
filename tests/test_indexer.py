@@ -1,10 +1,22 @@
 """Tests for duckbrain.indexer — DuckDB FTS index build + search + stats."""
 
 import pytest
+import duckdb
+from pathlib import Path
 
 from duckbrain import PageMetadata
 
 # ── build_fts_index tests ─────────────────────────────────────────────────────
+
+
+def test_persistent_index_reopens_and_searches(sample_pages: list[PageMetadata], tmp_path: Path) -> None:
+    from duckbrain.indexer import build_fts_index, search
+
+    database = tmp_path / "classic.duckdb"
+    build_fts_index(sample_pages, database).close()
+    with duckdb.connect(str(database), read_only=True) as conn:
+        assert conn.execute("SELECT count(*) FROM pages").fetchone()[0] == len(sample_pages)
+        assert search(conn, "memory")
 
 
 def test_build_fts_index_returns_connection(sample_pages: list[PageMetadata]) -> None:
