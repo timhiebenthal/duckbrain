@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -17,7 +18,14 @@ def provider():
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            body["_received_at"] = time.monotonic()
             requests.append(body)
+            if (
+                body.get("model") == "rate-limited"
+                and sum(r.get("model") == "rate-limited" for r in requests) == 1
+            ):
+                self.send_error(429)
+                return
             if body.get("model") == "fail":
                 self.send_error(500)
                 return
@@ -56,6 +64,22 @@ def provider():
     server.shutdown()
     thread.join()
     server.server_close()
+
+
+def test_paces_batches_and_retries_rate_limits(temp_vault: Path, tmp_path: Path, provider):
+    url, requests = provider
+    index_vault(
+        temp_vault,
+        tmp_path / "rag.duckdb",
+        MistralClient("test", url),
+        "rate-limited",
+        batch_size=2,
+        request_interval=0.05,
+    )
+    assert len(requests) > 2
+    assert all(
+        b["_received_at"] - a["_received_at"] >= 0.045 for a, b in zip(requests, requests[1:])
+    )
 
 
 def test_incremental_embeddings_and_atomic_failure(temp_vault: Path, tmp_path: Path, provider):

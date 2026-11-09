@@ -23,7 +23,7 @@ export MISTRAL_API_KEY='your-key'
 uv run python -m duckbrain.rag index /path/to/vault --exclude daily --model mistral-embed
 ```
 
-The count and text volume are printed before embedding. Repeat the index command after changes; unchanged passage vectors are reused, new or changed passages are embedded, and deleted or excluded pages leave the current index. The embedding cache and old runs remain in the private database. A new model causes re-embedding. Indexing builds a temporary database next to the destination and replaces it only after success; close other database connections before indexing. Fixed 1,000-character passages use character offsets into the parsed page body. Full file hashes and the corpus version record source changes.
+The count and text volume are printed before embedding. Embedding requests are spaced at least 10 seconds apart by default; use `--request-interval` to change the interval. Rate-limit responses are retried up to three times with backoff. Repeat the index command after changes; unchanged passage vectors are reused, new or changed passages are embedded, and deleted or excluded pages leave the current index. The embedding cache and old runs remain in the private database. A new model causes re-embedding. Indexing builds a temporary database next to the destination and replaces it only after success; close other database connections before indexing. Fixed 1,000-character passages use character offsets into the parsed page body. Full file hashes and the corpus version record source changes.
 
 ## Compare and answer
 

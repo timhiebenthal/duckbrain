@@ -8,6 +8,8 @@ import os
 import re
 import shutil
 import tempfile
+import time
+import urllib.error
 import uuid
 from pathlib import Path
 
@@ -131,10 +133,13 @@ def index_vault(
     model: str,
     excludes: list[str] | None = None,
     batch_size: int = 32,
+    request_interval: float = 0,
 ) -> None:
     """Build an index privately, then publish it only after all embeddings succeed."""
     if batch_size < 1:
         raise ValueError("Batch size must be positive")
+    if not math.isfinite(request_interval) or request_interval < 0:
+        raise ValueError("Request interval must be a non-negative finite number")
     database.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=".rag-index-", suffix=".duckdb", dir=database.parent)
     os.close(fd)
@@ -170,9 +175,24 @@ def index_vault(
                 if digest not in cached:
                     missing[digest] = text
             items = list(missing.items())
+            last_request: float | None = None
             for start in range(0, len(items), batch_size):
                 batch = items[start : start + batch_size]
-                vectors = client.embed([text for _, text in batch], model)
+                for attempt in range(4):
+                    if last_request is not None:
+                        time.sleep(max(0, request_interval - (time.monotonic() - last_request)))
+                    last_request = time.monotonic()
+                    try:
+                        vectors = client.embed([text for _, text in batch], model)
+                        break
+                    except urllib.error.HTTPError as exc:
+                        if exc.code != 429 or attempt == 3:
+                            raise
+                        time.sleep(max(request_interval, 1) * (2**attempt))
+                print(
+                    f"Embedded {min(start + batch_size, len(items))}/{len(items)} passages",
+                    flush=True,
+                )
                 for (digest, _), vector in zip(batch, vectors):
                     cached[digest] = vector
                     conn.execute(
@@ -353,6 +373,12 @@ def main() -> None:
     index.add_argument("--exclude", action="append", default=[])
     index.add_argument("--model", default="mistral-embed")
     index.add_argument("--batch-size", type=int, default=32)
+    index.add_argument(
+        "--request-interval",
+        type=float,
+        default=10,
+        help="Seconds between embedding requests (default: 10)",
+    )
     search = sub.add_parser("compare", help="Compare BM25 and embeddings")
     search.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
     search.add_argument("--question", required=True)
@@ -372,7 +398,15 @@ def main() -> None:
     if args.command == "index":
         if args.database.resolve().is_relative_to(args.vault.resolve()):
             parser.error("Database must be outside the vault")
-        index_vault(args.vault, args.database, client, args.model, args.exclude, args.batch_size)
+        index_vault(
+            args.vault,
+            args.database,
+            client,
+            args.model,
+            args.exclude,
+            args.batch_size,
+            args.request_interval,
+        )
     elif args.command == "compare":
         run_id, results = compare(args.database, client, args.question, args.limit)
         print(json.dumps({"run_id": run_id, "results": results}, indent=2))
