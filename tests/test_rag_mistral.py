@@ -276,8 +276,8 @@ def test_ab_cli_prompts_and_compares_classic_with_embeddings(
         check=True,
         env={**os.environ, "MISTRAL_API_KEY": "test", "MISTRAL_BASE_URL": url},
     )
-    assert "Classic" in result.stdout
-    assert "Embedding" in result.stdout
+    assert '"bm25"' in result.stdout
+    assert '"rag"' in result.stdout
     assert "agent-memory-systems.md" in result.stdout
     assert len(requests) == 1 and requests[0]["input"] == ["taxonomy"]
     folders = list((tmp_path / "results").iterdir())
@@ -293,6 +293,17 @@ def test_ab_cli_prompts_and_compares_classic_with_embeddings(
     assert body in bm25
     assert "Score:" in bm25 and "Score:" in rag_output
     assert str(folders[0]) in result.stdout
+    report = json.loads((folders[0] / "comparison.json").read_text())
+    assert report["question"] == "taxonomy"
+    assert "taxonomi" in report["bm25"]["search_terms"]
+    assert report["bm25"]["results"][0]["filepath"].endswith("agent-memory-systems.md")
+    assert report["bm25"]["results"][0]["characters"] == len(body)
+    assert report["bm25"]["results"][0]["estimated_tokens"] == (len(body) + 3) // 4
+    assert report["rag"]["results"][0]["passage_id"]
+    assert report["rag"]["total_estimated_tokens"] == sum(
+        r["estimated_tokens"] for r in report["rag"]["results"]
+    )
+    assert "text" not in report["rag"]["results"][0]
 
 
 def test_cli_workflow(temp_vault: Path, tmp_path: Path, provider):

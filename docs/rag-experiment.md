@@ -35,6 +35,8 @@ uv run python -m duckbrain.rag ab
 
 Enter a question at the prompt, or pass `--question 'your question'`. Use `--limit 5` to set the number of results per method. Each comparison saves `bm25_result.md` (full matched pages) and `rag_result.md` (matched passages) in a new timestamped folder under `.rag/results/`. Both files include the question, rank, path, and score. The files contain private vault text; use `--output-dir` to choose another location. The command reads `.rag/classic.duckdb` and `.rag/corpus.duckdb`; override them with `--classic-database` and `--database` if needed. It sends the question to Mistral for one embedding without saving a run in the database. The classic index is a snapshot; rebuild it to a new path if the vault has changed. BM25 and cosine scores have different scales.
 
+The command also prints and saves `comparison.json` with DuckDB's stemmed BM25 search terms, result paths and scores, RAG passage IDs, unique page counts, character counts, and estimated tokens. Token estimates are rounded up at one token per four characters; they are a rough sizing aid, not model-specific tokenization or API usage. BM25 counts full page bodies, while RAG counts returned passages, including repeated pages. These are retrieved results, not text sent to an answer model; this command does not generate an answer.
+
 For passage-level BM25 versus embedding retrieval, with results saved in the database:
 
 ```bash

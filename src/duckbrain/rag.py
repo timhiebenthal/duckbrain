@@ -457,25 +457,23 @@ def main() -> None:
             parser.error("Both classic and RAG databases must exist")
         with duckdb.connect(str(args.classic_database), read_only=True) as conn:
             classic_results = classic_search(conn, question, limit=args.limit)
+            search_terms = sorted(
+                row[0]
+                for row in conn.execute(
+                    "SELECT DISTINCT stem(unnest(fts_main_pages.tokenize(?)), 'porter')", [question]
+                ).fetchall()
+            )
             for hit in classic_results:
-                row = conn.execute(
+                page_row = conn.execute(
                     "SELECT body FROM pages WHERE filepath = ?", [hit["filepath"]]
                 ).fetchone()
-                if row is None:
+                if page_row is None:
                     raise ValueError("Classic search result is missing its page")
-                hit["body"] = row[0]
+                hit["body"] = page_row[0]
         with duckdb.connect(str(args.database), read_only=True) as conn:
-            embedding_results, _, _, _ = embedding_search(conn, client, question, args.limit)
-        for label, hits, text_field in (
-            ("Classic (page BM25)", classic_results, "snippet"),
-            ("Embedding (passage cosine)", embedding_results, "text"),
-        ):
-            print(f"\n{label}")
-            if not hits:
-                print("  No results")
-            for rank, hit in enumerate(hits, 1):
-                print(f"\n{rank}. {hit['title']} ({hit['filepath']})")
-                print(f"   Score: {hit['score']:.4f}\n   {hit[text_field]}")
+            embedding_results, embedding_model, _, _ = embedding_search(
+                conn, client, question, args.limit
+            )
         args.output_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         output = Path(tempfile.mkdtemp(prefix=f"{timestamp}_", dir=args.output_dir))
@@ -499,6 +497,41 @@ def main() -> None:
                     ]
                 )
             (output / filename).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        sections = {}
+        for name, hits, text_field in (
+            ("bm25", classic_results, "body"),
+            ("rag", embedding_results, "text"),
+        ):
+            rows = []
+            for rank, hit in enumerate(hits, 1):
+                characters = len(hit[text_field])
+                row = {
+                    "rank": rank,
+                    "title": hit["title"],
+                    "filepath": hit["filepath"],
+                    "score": hit["score"],
+                    "characters": characters,
+                    "estimated_tokens": (characters + 3) // 4,
+                }
+                if name == "rag":
+                    row["passage_id"] = hit["id"]
+                rows.append(row)
+            sections[name] = {
+                "results": rows,
+                "unique_pages": len({row["filepath"] for row in rows}),
+                "total_estimated_tokens": sum(row["estimated_tokens"] for row in rows),
+            }
+        sections["bm25"]["search_terms"] = search_terms
+        sections["rag"]["embedding_model"] = embedding_model
+        report = {
+            "question": question,
+            "token_estimate": "ceil(character count / 4); approximate, not model token usage",
+            "bm25": sections["bm25"],
+            "rag": sections["rag"],
+        }
+        report_json = json.dumps(report, indent=2, ensure_ascii=False)
+        (output / "comparison.json").write_text(report_json + "\n", encoding="utf-8")
+        print(report_json)
         print(f"\nSaved results to: {output}")
     else:
         print(json.dumps(answer_run(args.database, client, args.run, args.model), indent=2))
