@@ -33,7 +33,7 @@ Compare the classic page search against embedding retrieval directly:
 uv run python -m duckbrain.rag ab
 ```
 
-Enter a question at the prompt, or pass `--question 'your question'`. Use `--limit 5` to set the number of results per method. The command reads `.rag/classic.duckdb` and `.rag/corpus.duckdb`; override them with `--classic-database` and `--database` if needed. It sends the question to Mistral for one embedding and prints the results without saving a run. The classic index is a snapshot; rebuild it to a new path if the vault has changed. BM25 and cosine scores have different scales.
+Enter a question at the prompt, or pass `--question 'your question'`. Use `--limit 5` to set the number of results per method. Each comparison saves `bm25_result.md` (full matched pages) and `rag_result.md` (matched passages) in a new timestamped folder under `.rag/results/`. Both files include the question, rank, path, and score. The files contain private vault text; use `--output-dir` to choose another location. The command reads `.rag/classic.duckdb` and `.rag/corpus.duckdb`; override them with `--classic-database` and `--database` if needed. It sends the question to Mistral for one embedding without saving a run in the database. The classic index is a snapshot; rebuild it to a new path if the vault has changed. BM25 and cosine scores have different scales.
 
 For passage-level BM25 versus embedding retrieval, with results saved in the database:
 

@@ -267,6 +267,8 @@ def test_ab_cli_prompts_and_compares_classic_with_embeddings(
             str(rag),
             "--limit",
             "2",
+            "--output-dir",
+            str(tmp_path / "results"),
         ],
         input="taxonomy\n",
         text=True,
@@ -278,6 +280,19 @@ def test_ab_cli_prompts_and_compares_classic_with_embeddings(
     assert "Embedding" in result.stdout
     assert "agent-memory-systems.md" in result.stdout
     assert len(requests) == 1 and requests[0]["input"] == ["taxonomy"]
+    folders = list((tmp_path / "results").iterdir())
+    assert len(folders) == 1
+    bm25 = (folders[0] / "bm25_result.md").read_text()
+    rag_output = (folders[0] / "rag_result.md").read_text()
+    assert "taxonomy" in bm25 and "taxonomy" in rag_output
+    assert "agent-memory-systems.md" in bm25
+    with duckdb.connect(str(classic), read_only=True) as conn:
+        body = conn.execute(
+            "SELECT body FROM pages WHERE filepath LIKE '%agent-memory-systems.md'"
+        ).fetchone()[0]
+    assert body in bm25
+    assert "Score:" in bm25 and "Score:" in rag_output
+    assert str(folders[0]) in result.stdout
 
 
 def test_cli_workflow(temp_vault: Path, tmp_path: Path, provider):

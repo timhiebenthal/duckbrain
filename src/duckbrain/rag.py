@@ -11,6 +11,7 @@ import tempfile
 import time
 import urllib.error
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 import duckdb
@@ -401,6 +402,7 @@ def main() -> None:
     ab.add_argument("--classic-database", type=Path, default=Path(".rag/classic.duckdb"))
     ab.add_argument("--question", help="Question to compare; prompts if omitted")
     ab.add_argument("--limit", type=int, default=5)
+    ab.add_argument("--output-dir", type=Path, default=Path(".rag/results"))
     answer = sub.add_parser("answer", help="Send retrieved passages to Mistral chat")
     answer.add_argument("--database", type=Path, default=Path(".rag/corpus.duckdb"))
     answer.add_argument("--run", required=True)
@@ -455,6 +457,13 @@ def main() -> None:
             parser.error("Both classic and RAG databases must exist")
         with duckdb.connect(str(args.classic_database), read_only=True) as conn:
             classic_results = classic_search(conn, question, limit=args.limit)
+            for hit in classic_results:
+                row = conn.execute(
+                    "SELECT body FROM pages WHERE filepath = ?", [hit["filepath"]]
+                ).fetchone()
+                if row is None:
+                    raise ValueError("Classic search result is missing its page")
+                hit["body"] = row[0]
         with duckdb.connect(str(args.database), read_only=True) as conn:
             embedding_results, _, _, _ = embedding_search(conn, client, question, args.limit)
         for label, hits, text_field in (
@@ -467,6 +476,30 @@ def main() -> None:
             for rank, hit in enumerate(hits, 1):
                 print(f"\n{rank}. {hit['title']} ({hit['filepath']})")
                 print(f"   Score: {hit['score']:.4f}\n   {hit[text_field]}")
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output = Path(tempfile.mkdtemp(prefix=f"{timestamp}_", dir=args.output_dir))
+        for filename, label, hits, text_field in (
+            ("bm25_result.md", "Classic BM25", classic_results, "body"),
+            ("rag_result.md", "RAG embeddings", embedding_results, "text"),
+        ):
+            lines = [f"# {label}", "", f"Question: {question}", ""]
+            if not hits:
+                lines.append("No results.")
+            for rank, hit in enumerate(hits, 1):
+                lines.extend(
+                    [
+                        f"## {rank}. {hit['title']}",
+                        "",
+                        f"Path: {hit['filepath']}",
+                        f"Score: {hit['score']:.6f}",
+                        "",
+                        hit[text_field],
+                        "",
+                    ]
+                )
+            (output / filename).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"\nSaved results to: {output}")
     else:
         print(json.dumps(answer_run(args.database, client, args.run, args.model), indent=2))
 
