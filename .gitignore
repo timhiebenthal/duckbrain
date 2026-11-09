@@ -10,3 +10,5 @@ __marimo__/
 node_modules/
 .omc/
 .cursor/mcp.json
+
+.rag/
