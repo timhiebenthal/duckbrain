@@ -7,6 +7,8 @@ src/duckbrain/tools/vault_context.py.
 from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
+
 
 def test_codex_snapshot_contains_available_vault_context(temp_vault: Path) -> None:
     from duckbrain.tools.vault_context import build_codex_snapshot
@@ -26,6 +28,29 @@ def test_codex_snapshot_handles_missing_optional_files(tmp_path: Path) -> None:
     from duckbrain.tools.vault_context import build_codex_snapshot
 
     assert isinstance(build_codex_snapshot(str(tmp_path)), str)
+
+
+def test_codex_snapshot_skips_invalid_utf8(
+    temp_vault: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    from duckbrain.tools.vault_context import build_codex_snapshot
+
+    log_path = temp_vault / "wiki" / "log.md"
+    malformed_log = b"entry\x97entry"
+    log_path.write_bytes(malformed_log)
+    (temp_vault / "imprint.md").write_text("identity-marker", encoding="utf-8")
+    _create_daily_file(temp_vault, date.today(), "today-marker")
+
+    result = build_codex_snapshot(str(temp_vault))
+
+    assert "identity-marker" in result
+    assert "today-marker" in result
+    assert "Recent vault writes" not in result
+    assert any(
+        record.levelname == "WARNING" and str(log_path) in record.getMessage()
+        for record in caplog.records
+    )
+    assert log_path.read_bytes() == malformed_log
 
 
 def _create_daily_file(vault: Path, day: date, content: str) -> Path:

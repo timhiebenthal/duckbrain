@@ -1,10 +1,13 @@
 """MCP tool: vault_context — get context about the vault (dailies + search)."""
 
+import logging
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 from duckbrain.tools.vault_search import handle_vault_search
+
+logger = logging.getLogger(__name__)
 
 
 def build_codex_snapshot(vault_path: str) -> str:
@@ -25,7 +28,10 @@ def build_codex_snapshot(vault_path: str) -> str:
     for label, path in files:
         try:
             content = path.read_text(encoding="utf-8")
-        except OSError:
+        except FileNotFoundError:
+            continue
+        except (OSError, UnicodeDecodeError) as exc:
+            logger.warning("Skipping unreadable startup context file %s: %s", path, exc)
             continue
         if label == "Recent vault writes":
             content = "\n".join(content.splitlines()[-30:])
